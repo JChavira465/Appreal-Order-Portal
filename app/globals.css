@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-script: var(--font-script);
+}
+
+/* Scales every Tailwind text size (all rem-based) app-wide from one
+   place, rather than bumping text-xs/sm/etc. on every element -- the
+   root size drives them all proportionally. */
+html {
+  font-size: 118%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
