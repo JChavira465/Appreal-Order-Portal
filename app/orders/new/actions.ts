@@ -28,6 +28,7 @@ export async function createOrder(
     return { ok: false, message: "Not signed in." };
   }
 
+  const intent = String(formData.get("intent") ?? "submit") === "draft" ? "draft" : "submit";
   const teamName = String(formData.get("teamName") ?? "").trim();
   const contactName = String(formData.get("contactName") ?? "").trim();
   const contactPhone = String(formData.get("contactPhone") ?? "").trim();
@@ -35,12 +36,20 @@ export async function createOrder(
   const deadline = String(formData.get("deadline") ?? "").trim();
   const shippingAddress = String(formData.get("shippingAddress") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
-  const refNotes = String(formData.get("refNotes") ?? "").trim();
   const shippingFeeRaw = String(formData.get("shippingFee") ?? "").trim();
   const shippingFee = shippingFeeRaw === "" ? 0 : Number(shippingFeeRaw);
   const itemsJson = String(formData.get("itemsJson") ?? "[]");
 
-  if (!teamName || !deadline) {
+  if (!teamName) {
+    return {
+      ok: false,
+      message:
+        intent === "draft"
+          ? "At least a team name is needed to save a draft."
+          : "Team name and deadline are required.",
+    };
+  }
+  if (intent === "submit" && !deadline) {
     return { ok: false, message: "Team name and deadline are required." };
   }
 
@@ -54,7 +63,7 @@ export async function createOrder(
   const cleanItems = items.filter(
     (li) => li.item && li.sizes.some((sz) => sz.qty > 0),
   );
-  if (cleanItems.length === 0) {
+  if (intent === "submit" && cleanItems.length === 0) {
     return { ok: false, message: "Add at least one item with a size and quantity." };
   }
 
@@ -102,37 +111,55 @@ export async function createOrder(
       contact_name: contactName || null,
       contact_phone: contactPhone || null,
       sport: sport || null,
-      deadline,
+      deadline: deadline || null,
       shipping_fee: shippingFee,
       shipping_address: shippingAddress || null,
       notes: notes || null,
-      ref_notes: refNotes || null,
+      status: intent === "draft" ? "draft" : "submitted",
     })
     .select("id, order_number")
     .single();
 
   if (orderError || !order) {
-    return { ok: false, message: "Could not create the order. Try again." };
+    console.error("createOrder: orders insert failed", orderError);
+    return {
+      ok: false,
+      message: orderError
+        ? `Could not create the order: ${orderError.message}`
+        : "Could not create the order. Try again.",
+    };
   }
 
-  const { data: insertedItems, error: itemsError } = await supabase
-    .from("order_items")
-    .insert(
-      cleanItems.map((li) => ({
-        order_id: order.id,
-        item: li.item,
-        mods: li.mods,
-        qty: li.sizes.reduce((s, sz) => s + sz.qty, 0),
-      })),
-    )
-    .select("id");
+  // A draft is allowed to have zero items -- nothing to insert yet, and
+  // an empty insert() call is its own edge case to avoid.
+  const insertedItems: { id: string }[] = [];
+  if (cleanItems.length > 0) {
+    const { data, error: itemsError } = await supabase
+      .from("order_items")
+      .insert(
+        cleanItems.map((li) => ({
+          order_id: order.id,
+          item: li.item,
+          mods: li.mods,
+          qty: li.sizes.reduce((s, sz) => s + sz.qty, 0),
+        })),
+      )
+      .select("id");
 
-  if (itemsError || !insertedItems || insertedItems.length !== cleanItems.length) {
-    // Order shell exists but the items failed -- clean it up rather than
-    // leave an empty order behind. RLS lets the rep delete their own
-    // still-submitted order.
-    await supabase.from("orders").delete().eq("id", order.id);
-    return { ok: false, message: "Could not save the items. Try again." };
+    if (itemsError || !data || data.length !== cleanItems.length) {
+      console.error("createOrder: order_items insert failed", itemsError);
+      // Order shell exists but the items failed -- clean it up rather
+      // than leave an empty order behind. RLS lets the rep delete their
+      // own still-draft order; a manager can delete any order.
+      await supabase.from("orders").delete().eq("id", order.id);
+      return {
+        ok: false,
+        message: itemsError
+          ? `Could not save the items: ${itemsError.message}`
+          : "Could not save the items. Try again.",
+      };
+    }
+    insertedItems.push(...data);
   }
 
   const sizeEntries = cleanItems.flatMap((li, idx) =>
@@ -158,8 +185,14 @@ export async function createOrder(
       )
       .select("id");
     if (sizesError || !insertedSizes || insertedSizes.length !== sizeEntries.length) {
+      console.error("createOrder: order_item_sizes insert failed", sizesError);
       await supabase.from("orders").delete().eq("id", order.id);
-      return { ok: false, message: "Could not save item sizes. Try again." };
+      return {
+        ok: false,
+        message: sizesError
+          ? `Could not save item sizes: ${sizesError.message}`
+          : "Could not save item sizes. Try again.",
+      };
     }
 
     const nameRows = sizeEntries.flatMap((sz, idx) =>
@@ -206,8 +239,12 @@ export async function createOrder(
     order_id: order.id,
     actor_id: user.id,
     actor_name: profile?.full_name ?? user.email,
-    text: "submitted order",
+    text: intent === "draft" ? "saved as draft" : "submitted order",
   });
 
-  redirect(`/orders?created=${order.order_number}`);
+  redirect(
+    intent === "draft"
+      ? `/orders?draft=${order.order_number}`
+      : `/orders?created=${order.order_number}`,
+  );
 }

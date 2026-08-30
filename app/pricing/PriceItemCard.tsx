@@ -5,6 +5,7 @@ import {
   updatePriceItemBase,
   setPriceItemActive,
   updatePriceItemSizeGroup,
+  updatePriceItemCategory,
   addModifier,
   updateModifierPrice,
   removeModifier,
@@ -20,6 +21,7 @@ export function PriceItemCard({
   name,
   basePrice,
   isHeadwear,
+  category,
   active,
   sizeGroup,
   modifiers,
@@ -27,6 +29,7 @@ export function PriceItemCard({
   name: string;
   basePrice: number;
   isHeadwear: boolean;
+  category: string | null;
   active: boolean;
   sizeGroup: SizeGroup;
   modifiers: Modifier[];
@@ -41,6 +44,10 @@ export function PriceItemCard({
   );
   const [sizeGroupState, sizeGroupAction, sizeGroupPending] = useActionState(
     updatePriceItemSizeGroup,
+    initialState,
+  );
+  const [categoryState, categoryAction, categoryPending] = useActionState(
+    updatePriceItemCategory,
     initialState,
   );
   const [addModState, addModAction, addModPending] = useActionState(
@@ -125,6 +132,33 @@ export function PriceItemCard({
         </div>
         {sizeGroupState && !sizeGroupState.ok && (
           <p className="mt-1 text-xs text-red-600">{sizeGroupState.message}</p>
+        )}
+      </form>
+
+      <form action={categoryAction} className="mt-3 border-t border-neutral-100 pt-3">
+        <input type="hidden" name="name" value={name} />
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+          Category
+        </label>
+        <div className="flex gap-2">
+          <input
+            name="category"
+            list="category-suggestions"
+            defaultValue={category ?? ""}
+            disabled={!active}
+            placeholder="e.g. JERSEY"
+            className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-sm text-black placeholder:text-neutral-400 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={categoryPending || !active}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
+          >
+            {categoryPending ? "…" : "Save"}
+          </button>
+        </div>
+        {categoryState && !categoryState.ok && (
+          <p className="mt-1 text-xs text-red-600">{categoryState.message}</p>
         )}
       </form>
 

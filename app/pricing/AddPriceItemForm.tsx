@@ -27,21 +27,34 @@ export function AddPriceItemForm() {
           className="rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-black placeholder:text-neutral-400 focus:border-black focus:outline-none"
         />
       </div>
-      <div className="mt-3">
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          Size group
-        </label>
-        <select
-          name="sizeGroup"
-          defaultValue="one_size"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-black focus:border-black focus:outline-none"
-        >
-          {SIZE_GROUPS.map((g) => (
-            <option key={g} value={g}>
-              {SIZE_GROUP_LABELS[g]}
-            </option>
-          ))}
-        </select>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Size group
+          </label>
+          <select
+            name="sizeGroup"
+            defaultValue="one_size"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-black focus:border-black focus:outline-none"
+          >
+            {SIZE_GROUPS.map((g) => (
+              <option key={g} value={g}>
+                {SIZE_GROUP_LABELS[g]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Category
+          </label>
+          <input
+            name="category"
+            list="category-suggestions"
+            placeholder="e.g. JERSEY"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-black placeholder:text-neutral-400 focus:border-black focus:outline-none"
+          />
+        </div>
       </div>
       <label className="mt-3 flex items-center gap-2 text-sm text-black">
         <input type="checkbox" name="isHeadwear" />

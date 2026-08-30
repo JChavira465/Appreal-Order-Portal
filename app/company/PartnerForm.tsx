@@ -20,7 +20,7 @@ export function AddPartnerForm() {
       <div className="grid grid-cols-2 gap-3">
         <input
           name="name"
-          placeholder="e.g. Partner A"
+          placeholder="e.g. Jay"
           className="rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-black placeholder:text-neutral-400 focus:border-black focus:outline-none"
         />
         <input

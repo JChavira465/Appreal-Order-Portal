@@ -10,18 +10,22 @@ const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
 };
 
+// login_events/vendor_payments timestamps -- shown in Texas time
+// regardless of what timezone the server happens to run in.
 function fmtDateTime(iso: string): string {
   const d = new Date(iso);
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
-  let hours = d.getHours();
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} · ${hours}:${minutes} ${ampm}`;
+  const datePart = d.toLocaleDateString("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const timePart = d.toLocaleTimeString("en-US", {
+    timeZone: "America/Chicago",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${datePart} · ${timePart}`;
 }
 
 export default async function CompanyPage() {

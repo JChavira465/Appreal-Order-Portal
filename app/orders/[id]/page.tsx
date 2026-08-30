@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { money, loadCatalog } from "@/lib/catalog";
 import { signedUrlsFor } from "@/lib/order-images";
@@ -8,15 +9,23 @@ import {
   AddReferenceImageForm,
 } from "./MockupSection";
 import { PaymentsManagerForm } from "./PaymentsSection";
-import { AdvanceButton, CancelButton, ReopenButton } from "./StatusActions";
+import {
+  AdvanceButton,
+  CancelButton,
+  DiscardDraftButton,
+  ReopenButton,
+} from "./StatusActions";
 import { LineCostForm, OrderCostForm } from "./CostSection";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/payment-methods";
 import { VenmoPayLink } from "./VenmoPayLink";
-import { VENMO_COLLECTORS } from "@/lib/venmo";
+import { loadVenmoCollectors } from "@/lib/venmo";
 import { AiConceptForm } from "./AiConceptSection";
 import { DeleteImageButton } from "./DeleteImageButton";
 import { BuildOrderExport } from "./BuildOrderExport";
 import type { BuildOrderLine } from "@/lib/exportOrders";
+import { TrackingList, TrackingManagerForm } from "./TrackingSection";
+import { isCarrier, type Carrier } from "@/lib/tracking";
+import { TrackLinkShare } from "./TrackLinkShare";
 
 const STAGES = [
   { key: "submitted", label: "Submitted" },
@@ -38,17 +47,19 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.round((d.getTime() - today.getTime()) / 86400000);
 }
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
 // Slash-free on purpose -- used in the Venmo note (see VENMO_COLLECTORS
 // below), where "/" characters have caused the deep link to fail to open.
+// order.created_at is a real timestamp -- shown in Texas time regardless
+// of what timezone the server happens to run in.
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  return d.toLocaleDateString("en-US", {
+    timeZone: "America/Chicago",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function timeAgo(iso: string): string {
@@ -70,7 +81,11 @@ function StatusPill({
   let bg = "#FFF7ED";
   let fg = "#B45309";
   let label = STAGES[STAGE_INDEX[status]]?.label ?? status;
-  if (status === "cancelled") {
+  if (status === "draft") {
+    bg = "#F4F4F5";
+    fg = "#52525B";
+    label = "Draft";
+  } else if (status === "cancelled") {
     bg = "#F4F4F5";
     fg = "#71717A";
     label = "Cancelled";
@@ -100,7 +115,7 @@ function StageSteps({
   revisionRequested: boolean;
 }) {
   const idx = STAGE_INDEX[status] ?? 0;
-  if (status === "cancelled") {
+  if (status === "cancelled" || status === "draft") {
     return <div className="h-1.5 rounded-full bg-neutral-200" />;
   }
   return (
@@ -146,6 +161,36 @@ function DeadlineFlag({
       <span className="text-[11px] font-bold text-amber-700">
         due in {d}d
       </span>
+    );
+  }
+  return null;
+}
+
+// Catches "this won't make it in time to ship" the moment a vendor
+// ready-by date is entered, rather than waiting for the customer deadline
+// itself to arrive.
+function VendorReadyWarning({
+  vendorReadyBy,
+  deadline,
+}: {
+  vendorReadyBy: string;
+  deadline: string;
+}) {
+  const shipBuffer = daysUntil(deadline)! - daysUntil(vendorReadyBy)!;
+  if (shipBuffer < 0) {
+    return (
+      <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+        Vendor won&apos;t have this ready until after the customer&apos;s
+        deadline — this will miss it unless one of the dates changes.
+      </div>
+    );
+  }
+  if (shipBuffer <= 2) {
+    return (
+      <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+        Only {shipBuffer} day{shipBuffer === 1 ? "" : "s"} between the vendor
+        being ready and the customer deadline — tight turnaround to ship.
+      </div>
     );
   }
   return null;
@@ -242,6 +287,11 @@ type OrderImage = {
   storage_path: string;
   kind: "reference" | "mockup" | "ai_concept";
 };
+type TrackingRow = {
+  id: string;
+  carrier: string;
+  tracking_number: string;
+};
 
 export default async function OrderDetailPage({
   params,
@@ -273,24 +323,26 @@ export default async function OrderDetailPage({
   const isManager =
     profile?.role === "manager" || profile?.role === "super_admin";
 
-  const [{ data: order }, catalog] = await Promise.all([
+  const [{ data: order }, catalog, venmoCollectors] = await Promise.all([
     supabase
       .from("orders")
       .select(
         `id, order_number, team_name, contact_name, contact_phone, sport, status,
          revision_requested, deadline, shipping_fee, shipping_address, discount,
-         notes, ref_notes, mockup_notes, created_at, updated_at, rep_id,
+         notes, mockup_notes, created_at, updated_at, rep_id,
          profiles(full_name),
          order_items(id, item, mods, qty, unit_price, line_total,
            order_item_sizes(size_label, qty,
              order_item_size_names(player_name, player_number))),
          payments(id, amount, method, note, created_at),
          activity_log(id, actor_name, text, created_at),
-         order_images(id, storage_path, kind)`,
+         order_images(id, storage_path, kind),
+         order_tracking_numbers(id, carrier, tracking_number)`,
       )
       .eq("id", id)
       .maybeSingle(),
     loadCatalog(supabase),
+    loadVenmoCollectors(supabase),
   ]);
 
   if (!order) {
@@ -323,6 +375,17 @@ export default async function OrderDetailPage({
     supabase,
     allImages.map((img) => img.storage_path),
   );
+  const trackingEntries = ((order.order_tracking_numbers ?? []) as TrackingRow[]).map(
+    (t) => ({
+      id: t.id,
+      carrier: (isCarrier(t.carrier) ? t.carrier : "other") as Carrier,
+      trackingNumber: t.tracking_number,
+    }),
+  );
+  const headerList = await headers();
+  const host = headerList.get("host") ?? "";
+  const proto = headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const trackUrl = `${proto}://${host}/track/${order.id}`;
   const repProfile = Array.isArray(order.profiles) ? order.profiles[0] : order.profiles;
   const repName: string = repProfile?.full_name ?? "—";
 
@@ -342,6 +405,8 @@ export default async function OrderDetailPage({
   const headwearByItem = new Map<string, boolean>();
   let manufacturerId: string | null = null;
   let shippingCostValue: number | null = null;
+  let suppliesCostValue: number | null = null;
+  let vendorReadyBy: string | null = null;
   let totalCost = 0;
   let hasAnyCost = false;
 
@@ -363,7 +428,7 @@ export default async function OrderDetailPage({
         : Promise.resolve({ data: [] }),
       supabase
         .from("order_costs")
-        .select("manufacturer_id, shipping_cost")
+        .select("manufacturer_id, shipping_cost, supplies_cost, vendor_ready_by")
         .eq("order_id", order.id)
         .maybeSingle(),
       supabase.from("price_items").select("name, is_headwear"),
@@ -393,14 +458,20 @@ export default async function OrderDetailPage({
     manufacturerId = orderCostRow?.manufacturer_id ?? null;
     shippingCostValue =
       orderCostRow?.shipping_cost == null ? null : Number(orderCostRow.shipping_cost);
+    suppliesCostValue =
+      orderCostRow?.supplies_cost == null ? null : Number(orderCostRow.supplies_cost);
+    vendorReadyBy = orderCostRow?.vendor_ready_by ?? null;
     hasAnyCost =
       [...costsByItemId.values()].some((c) => c.unit_cost !== null) ||
-      shippingCostValue !== null;
+      shippingCostValue !== null ||
+      suppliesCostValue !== null;
     totalCost =
       items.reduce((s, li) => {
         const c = costsByItemId.get(li.id);
         return c?.unit_cost != null ? s + c.unit_cost * li.qty : s;
-      }, 0) + (shippingCostValue ?? 0);
+      }, 0) +
+      (shippingCostValue ?? 0) +
+      (suppliesCostValue ?? 0);
   }
   const profit = total - totalCost;
 
@@ -411,18 +482,27 @@ export default async function OrderDetailPage({
       size: sz.size_label,
       count: sz.qty,
       unitCost: costsByItemId.get(li.id)?.unit_cost ?? null,
+      names: sz.order_item_size_names
+        .filter((n) => n.player_name || n.player_number)
+        .map((n) => ({
+          name: n.player_name ?? "",
+          number: n.player_number ?? "",
+        })),
     })),
   );
 
   const cancelled = order.status === "cancelled";
+  const isDraft = order.status === "draft";
   const isOwnRep = order.rep_id === user.id;
-  const repCanEdit = !isManager && isOwnRep && order.status === "submitted";
+  const repCanEdit =
+    !isManager && isOwnRep && (order.status === "submitted" || isDraft);
   const canEdit = isManager ? !cancelled : repCanEdit;
   const canApproveRevise =
     !isManager && isOwnRep && order.status === "mockup_pending";
-  const canCancel = !cancelled && (isManager || repCanEdit);
+  const canCancel = !cancelled && !isDraft && (isManager || repCanEdit);
+  const canDiscardDraft = isDraft && (isManager || isOwnRep);
   const canReopen = isManager && cancelled;
-  const canAdvance = isManager && !cancelled && order.status !== "shipped";
+  const canAdvance = isManager && !cancelled && !isDraft && order.status !== "shipped";
   const nextLabel = canAdvance
     ? STAGES[Math.min(STAGE_INDEX[order.status] + 1, STAGES.length - 1)].label
     : "";
@@ -477,6 +557,28 @@ export default async function OrderDetailPage({
           <p className="text-sm text-neutral-400">Not set yet.</p>
         )}
       </div>
+
+      {(trackingEntries.length > 0 || (isManager && !cancelled)) && (
+        <div className="mt-5">
+          <SectionLabel text="Tracking" />
+          <TrackingList orderId={order.id} entries={trackingEntries} canManage={isManager} />
+          {isManager && !cancelled && <TrackingManagerForm orderId={order.id} />}
+        </div>
+      )}
+
+      {!isDraft && (isOwnRep || isManager) && (
+        <div className="mt-5">
+          <SectionLabel text="Customer tracking link" />
+          <p className="text-[11px] text-neutral-400">
+            No login needed -- shows order status and tracking numbers, and
+            once a mockup&apos;s posted, the customer can approve it or
+            request changes right from this link themselves (same as the
+            Approve / Revise buttons below, just self-serve). Safe to text
+            or email to the customer.
+          </p>
+          <TrackLinkShare url={trackUrl} />
+        </div>
+      )}
 
       <div className="mt-5">
         <SectionLabel text="Items" />
@@ -578,8 +680,13 @@ export default async function OrderDetailPage({
             orderId={order.id}
             manufacturerId={manufacturerId}
             shippingCost={shippingCostValue}
+            suppliesCost={suppliesCostValue}
+            vendorReadyBy={vendorReadyBy}
             apparelVendors={apparelVendors}
           />
+          {vendorReadyBy && order.deadline && (
+            <VendorReadyWarning vendorReadyBy={vendorReadyBy} deadline={order.deadline} />
+          )}
           <div className="mt-3 flex justify-between border-t border-neutral-100 pt-3 text-sm font-bold">
             <span className="text-black">Profit</span>
             {hasAnyCost ? (
@@ -634,7 +741,7 @@ export default async function OrderDetailPage({
             <p className="mb-2 text-xs text-neutral-400">
               Pick whichever collector this payment should go to:
             </p>
-            {VENMO_COLLECTORS.map((collector) => (
+            {venmoCollectors.map((collector) => (
               <VenmoPayLink
                 key={collector.name}
                 collector={collector}
@@ -671,14 +778,9 @@ export default async function OrderDetailPage({
         )}
       </div>
 
-      {(order.ref_notes || referenceImages.length > 0 || isOwnRep) && (
+      {(referenceImages.length > 0 || isOwnRep) && (
         <div className="mt-6 border-t border-neutral-100 pt-5">
-          <SectionLabel text="Design reference from rep" />
-          {order.ref_notes && (
-            <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-black">
-              {order.ref_notes}
-            </div>
-          )}
+          <SectionLabel text="Reference photos" />
           <ImageGallery images={referenceImages} urls={imageUrls} orderId={order.id} canDelete={isManager} />
           {isOwnRep && !isManager && <AddReferenceImageForm orderId={order.id} />}
         </div>
@@ -720,8 +822,14 @@ export default async function OrderDetailPage({
           Updated {timeAgo(order.updated_at)}
         </div>
 
+        {isDraft && (
+          <p className="text-xs text-neutral-400">
+            This is a draft — only you (and managers) can see it until it&apos;s
+            submitted.
+          </p>
+        )}
         {canAdvance && <AdvanceButton orderId={order.id} nextLabel={nextLabel} />}
-        {!isManager && !cancelled && (
+        {!isManager && !cancelled && !isDraft && (
           <p className="text-xs text-neutral-400">
             Order status is managed by the office.
           </p>
@@ -732,7 +840,7 @@ export default async function OrderDetailPage({
             href={`/orders/${order.id}/edit`}
             className="block w-full rounded-xl border-2 border-neutral-300 py-3 text-center text-sm font-semibold text-black"
           >
-            Edit order
+            {isDraft ? "Continue editing draft" : "Edit order"}
           </Link>
         )}
         {!isManager && !repCanEdit && !canApproveRevise && !cancelled && (
@@ -743,6 +851,7 @@ export default async function OrderDetailPage({
         )}
 
         {canCancel && <CancelButton orderId={order.id} />}
+        {canDiscardDraft && <DiscardDraftButton orderId={order.id} />}
         {canReopen && <ReopenButton orderId={order.id} />}
 
         {(isOwnRep || isManager) && (
@@ -751,6 +860,14 @@ export default async function OrderDetailPage({
             className="block w-full rounded-xl border-2 border-neutral-300 py-3 text-center text-sm font-semibold text-black"
           >
             Reorder
+          </Link>
+        )}
+        {(isOwnRep || isManager) && (
+          <Link
+            href={`/orders/${order.id}/receipt`}
+            className="block w-full rounded-xl border-2 border-neutral-300 py-3 text-center text-sm font-semibold text-black"
+          >
+            View / print receipt
           </Link>
         )}
       </div>

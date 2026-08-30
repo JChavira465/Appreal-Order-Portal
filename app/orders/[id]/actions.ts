@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { uploadOrderImage, IMAGE_BUCKET } from "@/lib/order-images";
 import { isPaymentMethod, PAYMENT_METHOD_LABELS } from "@/lib/payment-methods";
+import { detectCarrier, isCarrier } from "@/lib/tracking";
 
 export type ActionResult = { ok: boolean; message: string } | null;
 
@@ -153,6 +154,55 @@ export async function deleteOrderImage(
   return { ok: true, message: "Photo removed." };
 }
 
+// Manager-only via RLS (order_tracking_numbers_insert requires is_manager()).
+export async function addTrackingNumber(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orderId = String(formData.get("orderId") ?? "");
+  const trackingNumber = String(formData.get("trackingNumber") ?? "").trim();
+  const carrierInput = String(formData.get("carrier") ?? "auto");
+  const actor = await currentActor();
+  if (!actor) return { ok: false, message: "Not signed in." };
+  if (!trackingNumber) return { ok: false, message: "Enter a tracking number." };
+
+  const carrier =
+    carrierInput !== "auto" && isCarrier(carrierInput)
+      ? carrierInput
+      : detectCarrier(trackingNumber);
+
+  const { error } = await actor.supabase.from("order_tracking_numbers").insert({
+    order_id: orderId,
+    carrier,
+    tracking_number: trackingNumber,
+  });
+  if (error) return { ok: false, message: friendlyError(error) };
+
+  await logActivity(actor.supabase, orderId, actor.id, actor.name, "added a tracking number");
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "Tracking number added." };
+}
+
+export async function removeTrackingNumber(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orderId = String(formData.get("orderId") ?? "");
+  const id = String(formData.get("id") ?? "");
+  const actor = await currentActor();
+  if (!actor) return { ok: false, message: "Not signed in." };
+
+  const { error } = await actor.supabase
+    .from("order_tracking_numbers")
+    .delete()
+    .eq("id", id);
+  if (error) return { ok: false, message: friendlyError(error) };
+
+  await logActivity(actor.supabase, orderId, actor.id, actor.name, "removed a tracking number");
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "Tracking number removed." };
+}
+
 export async function approveMockup(
   _prevState: ActionResult,
   formData: FormData,
@@ -275,6 +325,26 @@ export async function reopenOrder(
   return { ok: true, message: "Order reopened." };
 }
 
+// Deletes a draft outright rather than cancelling it -- it never became
+// a real order in anyone's queue, so there's nothing worth keeping a
+// cancelled-history row for. RLS only allows this while status is still
+// 'draft' (for the owning rep) or always (for a manager), so an
+// already-submitted order can't be deleted this way.
+export async function discardDraft(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orderId = String(formData.get("orderId") ?? "");
+  const actor = await currentActor();
+  if (!actor) return { ok: false, message: "Not signed in." };
+
+  const { error } = await actor.supabase.from("orders").delete().eq("id", orderId);
+  if (error) return { ok: false, message: friendlyError(error) };
+
+  revalidatePath("/orders");
+  redirect("/orders");
+}
+
 export async function recordPayment(
   _prevState: ActionResult,
   formData: FormData,
@@ -353,6 +423,7 @@ export async function updateOrder(
   const actor = await currentActor();
   if (!actor) return { ok: false, message: "Not signed in." };
 
+  const intent = String(formData.get("intent") ?? "submit") === "draft" ? "draft" : "submit";
   const teamName = String(formData.get("teamName") ?? "").trim();
   const contactName = String(formData.get("contactName") ?? "").trim();
   const contactPhone = String(formData.get("contactPhone") ?? "").trim();
@@ -360,13 +431,33 @@ export async function updateOrder(
   const deadline = String(formData.get("deadline") ?? "").trim();
   const shippingAddress = String(formData.get("shippingAddress") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
-  const refNotes = String(formData.get("refNotes") ?? "").trim();
   const shippingFeeRaw = String(formData.get("shippingFee") ?? "").trim();
   const shippingFee = shippingFeeRaw === "" ? 0 : Number(shippingFeeRaw);
   const itemsJson = String(formData.get("itemsJson") ?? "[]");
 
   if (!orderId) return { ok: false, message: "Missing order." };
-  if (!teamName || !deadline) {
+
+  // "Save draft" only means something if the order is still a draft --
+  // an already-submitted order has no draft state to fall back into.
+  // The current status is looked up server-side rather than trusted
+  // from the client, since it decides validation and what "intent"
+  // is even allowed to do.
+  const { data: current } = await actor.supabase
+    .from("orders")
+    .select("status, order_number")
+    .eq("id", orderId)
+    .single();
+  const savingDraft = intent === "draft" && current?.status === "draft";
+
+  if (!teamName) {
+    return {
+      ok: false,
+      message: savingDraft
+        ? "At least a team name is needed to save a draft."
+        : "Team name and deadline are required.",
+    };
+  }
+  if (!savingDraft && !deadline) {
     return { ok: false, message: "Team name and deadline are required." };
   }
 
@@ -379,7 +470,7 @@ export async function updateOrder(
   const cleanItems = items.filter(
     (li) => li.item && li.sizes.some((sz) => sz.qty > 0),
   );
-  if (cleanItems.length === 0) {
+  if (!savingDraft && cleanItems.length === 0) {
     return { ok: false, message: "Add at least one item with a size and quantity." };
   }
 
@@ -390,17 +481,18 @@ export async function updateOrder(
       contact_name: contactName || null,
       contact_phone: contactPhone || null,
       sport: sport || null,
-      deadline,
+      deadline: deadline || null,
       shipping_fee: shippingFee,
       shipping_address: shippingAddress || null,
       notes: notes || null,
-      ref_notes: refNotes || null,
+      ...(current?.status === "draft" ? { status: savingDraft ? "draft" : "submitted" } : {}),
     })
     .eq("id", orderId)
     .select("id")
     .single();
 
   if (orderError || !updated) {
+    console.error("updateOrder: orders update failed", orderError);
     return { ok: false, message: friendlyError(orderError) };
   }
 
@@ -416,19 +508,25 @@ export async function updateOrder(
     return { ok: false, message: "Could not update items. Try again." };
   }
 
-  const { data: insertedItems, error: itemsError } = await actor.supabase
-    .from("order_items")
-    .insert(
-      cleanItems.map((li) => ({
-        order_id: orderId,
-        item: li.item,
-        mods: li.mods,
-        qty: li.sizes.reduce((s, sz) => s + sz.qty, 0),
-      })),
-    )
-    .select("id");
-  if (itemsError || !insertedItems || insertedItems.length !== cleanItems.length) {
-    return { ok: false, message: "Could not save the items. Try again." };
+  // A draft is allowed to have zero items.
+  const insertedItems: { id: string }[] = [];
+  if (cleanItems.length > 0) {
+    const { data, error: itemsError } = await actor.supabase
+      .from("order_items")
+      .insert(
+        cleanItems.map((li) => ({
+          order_id: orderId,
+          item: li.item,
+          mods: li.mods,
+          qty: li.sizes.reduce((s, sz) => s + sz.qty, 0),
+        })),
+      )
+      .select("id");
+    if (itemsError || !data || data.length !== cleanItems.length) {
+      console.error("updateOrder: order_items insert failed", itemsError);
+      return { ok: false, message: friendlyError(itemsError) };
+    }
+    insertedItems.push(...data);
   }
 
   const sizeEntries = cleanItems.flatMap((li, idx) =>
@@ -453,7 +551,8 @@ export async function updateOrder(
       )
       .select("id");
     if (sizesError || !insertedSizes || insertedSizes.length !== sizeEntries.length) {
-      return { ok: false, message: "Could not save item sizes. Try again." };
+      console.error("updateOrder: order_item_sizes insert failed", sizesError);
+      return { ok: false, message: friendlyError(sizesError) };
     }
 
     const nameRows = sizeEntries.flatMap((sz, idx) =>
@@ -469,7 +568,20 @@ export async function updateOrder(
     }
   }
 
-  await logActivity(actor.supabase, orderId, actor.id, actor.name, "edited order details");
+  await logActivity(
+    actor.supabase,
+    orderId,
+    actor.id,
+    actor.name,
+    savingDraft
+      ? "updated draft"
+      : current?.status === "draft"
+        ? "submitted order"
+        : "edited order details",
+  );
   revalidatePath(`/orders/${orderId}`);
-  redirect(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  redirect(
+    savingDraft ? `/orders?draft=${current?.order_number}` : `/orders/${orderId}`,
+  );
 }

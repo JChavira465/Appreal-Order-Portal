@@ -18,8 +18,27 @@ type OrderItemRow = {
           | null;
       }[]
     | null;
+  order_item_costs:
+    | { unit_cost: number | null; vendors: VendorRef }
+    | { unit_cost: number | null; vendors: VendorRef }[]
+    | null;
 };
 type PaymentRow = { amount: number };
+type VendorRef = { name: string } | { name: string }[] | null;
+type OrderCostRow = {
+  shipping_cost: number | null;
+  supplies_cost: number | null;
+  vendors: VendorRef;
+};
+
+// order_item_costs is a one-to-one relation (order_item_id is its primary
+// key) but PostgREST still returns embedded one-to-ones as either a
+// single object or a one-element array depending on version/query shape
+// -- normalize both to a single value here rather than at every call site.
+function one<T>(rel: T | T[] | null): T | null {
+  if (Array.isArray(rel)) return rel[0] ?? null;
+  return rel;
+}
 type ProfileRef = { full_name: string | null } | { full_name: string | null }[] | null;
 
 function repName(profiles: ProfileRef): string {
@@ -31,9 +50,9 @@ function repName(profiles: ProfileRef): string {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; draft?: string; q?: string }>;
 }) {
-  const { created } = await searchParams;
+  const { created, draft, q } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -46,23 +65,39 @@ export default async function OrdersPage({
   const isManager =
     profile?.role === "manager" || profile?.role === "super_admin";
 
+  // Visiting the board is "I've seen what's here" -- bumps orders_viewed_at
+  // so the home page's "N new orders" banner clears. Serverless functions
+  // can get torn down right after the response ships, so this is awaited
+  // (alongside the orders query, not blocking on it) rather than fired and
+  // forgotten.
   const [{ data: orders }, catalog] = await Promise.all([
     supabase
       .from("orders")
       .select(
         `id, order_number, team_name, sport, contact_name, contact_phone,
          status, revision_requested, deadline, shipping_fee, shipping_address,
-         discount, notes, ref_notes, created_at, updated_at,
+         discount, notes, created_at, updated_at,
          profiles(full_name),
          order_items(item, mods, qty, unit_price, line_total,
            order_item_sizes(size_label, qty,
-             order_item_size_names(player_name, player_number))),
+             order_item_size_names(player_name, player_number)),
+           order_item_costs(unit_cost, vendors(name))),
+         order_costs(shipping_cost, supplies_cost, vendors(name)),
          payments(amount)`,
       )
       .order("created_at", { ascending: false }),
     loadCatalog(supabase),
+    isManager && user
+      ? supabase
+          .from("profiles")
+          .update({ orders_viewed_at: new Date().toISOString() })
+          .eq("id", user.id)
+      : Promise.resolve(null),
   ]);
 
+  // Cost/vendor data only ever comes back non-empty for a manager -- RLS
+  // on order_item_costs/order_costs is manager-only, so a rep's embedded
+  // relations here are just always empty, same as if we hadn't asked.
   const rows: OrderRow[] = (orders ?? []).map((o) => {
     const items = (o.order_items ?? []) as OrderItemRow[];
     const payments = (o.payments ?? []) as PaymentRow[];
@@ -70,6 +105,33 @@ export default async function OrdersPage({
     const total =
       subtotal + Number(o.shipping_fee ?? 0) - Number(o.discount ?? 0);
     const paid = payments.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
+    const orderCost = one(o.order_costs as OrderCostRow | OrderCostRow[] | null);
+    const shippingCost =
+      orderCost?.shipping_cost != null ? Number(orderCost.shipping_cost) : null;
+    const suppliesCost =
+      orderCost?.supplies_cost != null ? Number(orderCost.supplies_cost) : null;
+    const orderVendorName = one(orderCost?.vendors ?? null)?.name ?? null;
+
+    const itemCosts = items.map((li) => {
+      const cost = one(li.order_item_costs);
+      const unitCost = cost?.unit_cost != null ? Number(cost.unit_cost) : null;
+      const isHeadwear = catalog[li.item]?.isHeadwear ?? false;
+      const lineVendorName = one(cost?.vendors ?? null)?.name ?? null;
+      const vendorName = lineVendorName ?? (isHeadwear ? null : orderVendorName);
+      return { unitCost, vendorName };
+    });
+    const hasAnyCost =
+      itemCosts.some((c) => c.unitCost != null) ||
+      shippingCost != null ||
+      suppliesCost != null;
+    const totalCost =
+      items.reduce((s, li, i) => {
+        const c = itemCosts[i].unitCost;
+        return c != null ? s + c * li.qty : s;
+      }, 0) +
+      (shippingCost ?? 0) +
+      (suppliesCost ?? 0);
 
     return {
       id: o.id,
@@ -91,12 +153,22 @@ export default async function OrdersPage({
       total,
       paid,
       balanceDue: total - paid,
-      refNotes: o.ref_notes ?? "",
       notes: o.notes ?? "",
       createdAt: o.created_at,
       updatedAt: o.updated_at,
-      items: items.map((li) => ({
+      shippingCost,
+      suppliesCost,
+      totalCost: hasAnyCost ? totalCost : null,
+      profit: hasAnyCost ? total - totalCost : null,
+      items: items.map((li, i) => ({
         item: li.item,
+        vendorName: itemCosts[i].vendorName,
+        unitCost: itemCosts[i].unitCost,
+        lineCost: itemCosts[i].unitCost != null ? itemCosts[i].unitCost! * li.qty : null,
+        lineProfit:
+          itemCosts[i].unitCost != null
+            ? Number(li.line_total ?? 0) - itemCosts[i].unitCost! * li.qty
+            : null,
         modLabels: (li.mods ?? []).map(
           (key) =>
             catalog[li.item]?.modifiers.find((m) => m.key === key)?.label ?? key,
@@ -126,7 +198,12 @@ export default async function OrdersPage({
           Order #{created} submitted.
         </div>
       )}
-      <OrderBoard orders={rows} isManager={isManager} />
+      {draft && (
+        <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+          Order #{draft} saved as a draft — only you can see it until you submit it.
+        </div>
+      )}
+      <OrderBoard orders={rows} isManager={isManager} initialQuery={q ?? ""} />
     </main>
   );
 }

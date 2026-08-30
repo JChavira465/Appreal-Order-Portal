@@ -40,7 +40,6 @@ export default async function NewOrderPage({
         sport: sourceOrder.sport ?? "",
         deadline: "",
         notes: "",
-        refNotes: "",
         shippingFee: "",
         shippingAddress: sourceOrder.shipping_address ?? "",
         items: (sourceOrder.order_items ?? []).map((li) => ({

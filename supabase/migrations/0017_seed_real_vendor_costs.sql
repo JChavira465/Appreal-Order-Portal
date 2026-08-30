@@ -1,0 +1,6 @@
+-- This shop's vendors and per-item costs are entered from the
+-- Vendors page in-app (see app/vendors) rather than seeded here --
+-- vendor names, codes, and costs are one company's own data, not
+-- something every deployment of this app should ship with. Nothing to
+-- run for this migration; kept as a placeholder so the migration
+-- numbering stays intact.

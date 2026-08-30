@@ -25,10 +25,15 @@ export type OrderRow = {
   total: number;
   paid: number;
   balanceDue: number;
-  refNotes: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
+  // Manager-only -- RLS on order_item_costs/order_costs means these are
+  // always null for a rep, same as if the data had never been fetched.
+  shippingCost: number | null;
+  suppliesCost: number | null;
+  totalCost: number | null;
+  profit: number | null;
   items: {
     item: string;
     modLabels: string[];
@@ -40,6 +45,10 @@ export type OrderRow = {
     qty: number;
     unitPrice: number;
     lineTotal: number;
+    vendorName: string | null;
+    unitCost: number | null;
+    lineCost: number | null;
+    lineProfit: number | null;
   }[];
 };
 
@@ -69,11 +78,27 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.round((d.getTime() - today.getTime()) / 86400000);
 }
 
+// createdAt is a UTC timestamp string -- slicing it directly for the
+// month filter would put a late-evening Texas order in the wrong month
+// right at a month boundary. en-CA renders as YYYY-MM, so this reads out
+// the Texas-local month without ever constructing a shifted Date.
+function monthKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+  });
+}
+
 function StatusPill({ order }: { order: OrderRow }) {
   let bg = "#FFF7ED";
   let fg = "#B45309";
   let label: string = STAGES[STAGE_INDEX[order.status]]?.label ?? order.status;
-  if (order.status === "cancelled") {
+  if (order.status === "draft") {
+    bg = "#F4F4F5";
+    fg = "#52525B";
+    label = "Draft";
+  } else if (order.status === "cancelled") {
     bg = "#F4F4F5";
     fg = "#71717A";
     label = "Cancelled";
@@ -99,7 +124,7 @@ function StatusPill({ order }: { order: OrderRow }) {
 
 function StageSteps({ order }: { order: OrderRow }) {
   const idx = STAGE_INDEX[order.status] ?? 0;
-  if (order.status === "cancelled") {
+  if (order.status === "cancelled" || order.status === "draft") {
     return <div className="h-1.5 rounded-full bg-neutral-200" />;
   }
   return (
@@ -124,7 +149,7 @@ function StageSteps({ order }: { order: OrderRow }) {
 }
 
 function DeadlineFlag({ order }: { order: OrderRow }) {
-  if (order.status === "shipped" || order.status === "cancelled") return null;
+  if (["shipped", "cancelled", "draft"].includes(order.status)) return null;
   const d = daysUntil(order.deadline);
   if (d === null) return null;
   if (d < 0) {
@@ -147,16 +172,20 @@ function DeadlineFlag({ order }: { order: OrderRow }) {
 export function OrderBoard({
   orders,
   isManager,
+  initialQuery,
 }: {
   orders: OrderRow[];
   isManager: boolean;
+  initialQuery?: string;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery ?? "");
   const [sort, setSort] = useState<"deadline" | "newest" | "total">(
     "deadline",
   );
   const [rep, setRep] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
+  const [fromMonth, setFromMonth] = useState("");
+  const [toMonth, setToMonth] = useState("");
   const [exportFailed, setExportFailed] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
 
@@ -170,6 +199,8 @@ export function OrderBoard({
       showCancelled ? true : o.status !== "cancelled",
     );
     if (isManager && rep) l = l.filter((o) => o.repName === rep);
+    if (fromMonth) l = l.filter((o) => monthKey(o.createdAt) >= fromMonth);
+    if (toMonth) l = l.filter((o) => monthKey(o.createdAt) <= toMonth);
     if (q.trim()) {
       const s = q.trim().toLowerCase();
       l = l.filter(
@@ -190,17 +221,18 @@ export function OrderBoard({
       sorted.sort((a, b) => b.total - a.total);
     }
     return sorted;
-  }, [orders, q, sort, rep, showCancelled, isManager]);
+  }, [orders, q, sort, rep, showCancelled, isManager, fromMonth, toMonth]);
 
   const openTotal = list
-    .filter((o) => o.status !== "cancelled")
+    .filter((o) => o.status !== "cancelled" && o.status !== "draft")
     .reduce((s, o) => s + o.total, 0);
   const dueTotal = list
-    .filter((o) => o.status !== "cancelled")
+    .filter((o) => o.status !== "cancelled" && o.status !== "draft")
     .reduce((s, o) => s + o.balanceDue, 0);
   const overdueCount = list.filter(
     (o) =>
       o.status !== "cancelled" &&
+      o.status !== "draft" &&
       o.status !== "shipped" &&
       (daysUntil(o.deadline) ?? 0) < 0,
   ).length;
@@ -228,10 +260,13 @@ export function OrderBoard({
       total: o.total,
       paid: o.paid,
       balanceDue: o.balanceDue,
-      refNotes: o.refNotes,
       notes: o.notes,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
+      shippingCost: o.shippingCost,
+      suppliesCost: o.suppliesCost,
+      totalCost: o.totalCost,
+      profit: o.profit,
       items: o.items,
     }));
 
@@ -242,7 +277,7 @@ export function OrderBoard({
     }
     try {
       const { exportToExcel } = await import("@/lib/exportOrders");
-      exportToExcel(toExportRows(list));
+      await exportToExcel(toExportRows(list));
       setExportFailed(false);
       setExportMessage("Excel file downloaded");
     } catch {
@@ -369,6 +404,41 @@ export function OrderBoard({
         >
           Cancelled
         </button>
+      </div>
+
+      <div className="mb-4">
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+          Date range (by submitted month)
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={fromMonth}
+            onChange={(e) => setFromMonth(e.target.value)}
+            aria-label="From month"
+            className="flex-1 rounded-lg border border-neutral-300 px-2 py-2 text-xs text-black"
+          />
+          <span className="text-xs text-neutral-400">to</span>
+          <input
+            type="month"
+            value={toMonth}
+            onChange={(e) => setToMonth(e.target.value)}
+            aria-label="To month"
+            className="flex-1 rounded-lg border border-neutral-300 px-2 py-2 text-xs text-black"
+          />
+          {(fromMonth || toMonth) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFromMonth("");
+                setToMonth("");
+              }}
+              className="shrink-0 text-xs font-semibold text-neutral-400 underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {list.length === 0 ? (

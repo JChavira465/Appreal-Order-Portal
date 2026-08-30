@@ -45,7 +45,7 @@ export default async function PricingPage() {
   const [{ data: items }, { data: modifiers }] = await Promise.all([
     supabase
       .from("price_items")
-      .select("name, base_price, is_headwear, size_group, active, sort_order")
+      .select("name, base_price, is_headwear, size_group, category, active, sort_order")
       .order("sort_order"),
     supabase
       .from("price_modifiers")
@@ -71,6 +71,16 @@ export default async function PricingPage() {
         price they were quoted at.
       </p>
 
+      <datalist id="category-suggestions">
+        <option value="JERSEY" />
+        <option value="HOODIE" />
+        <option value="BOTTOMS" />
+        <option value="JACKET" />
+        <option value="HAT" />
+        <option value="GLOVES" />
+        <option value="SPECIALTY" />
+      </datalist>
+
       <div className="mb-6">
         <AddPriceItemForm />
       </div>
@@ -82,6 +92,7 @@ export default async function PricingPage() {
             name={item.name}
             basePrice={Number(item.base_price)}
             isHeadwear={item.is_headwear}
+            category={item.category}
             active={item.active}
             sizeGroup={isSizeGroup(item.size_group) ? item.size_group : "one_size"}
             modifiers={modsByItem.get(item.name) ?? []}

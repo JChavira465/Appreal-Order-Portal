@@ -126,11 +126,15 @@ export function OrderCostForm({
   orderId,
   manufacturerId,
   shippingCost,
+  suppliesCost,
+  vendorReadyBy,
   apparelVendors,
 }: {
   orderId: string;
   manufacturerId: string | null;
   shippingCost: number | null;
+  suppliesCost: number | null;
+  vendorReadyBy: string | null;
   apparelVendors: Vendor[];
 }) {
   const [state, formAction, pending] = useActionState(setOrderCosts, initialState);
@@ -138,24 +142,24 @@ export function OrderCostForm({
   return (
     <form action={formAction} className="mt-3 space-y-2">
       <input type="hidden" name="orderId" value={orderId} />
+      <div>
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+          Manufacturer
+        </label>
+        <select
+          name="manufacturerId"
+          defaultValue={manufacturerId ?? ""}
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black focus:border-black focus:outline-none"
+        >
+          <option value="">Not set</option>
+          {apparelVendors.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
-            Manufacturer
-          </label>
-          <select
-            name="manufacturerId"
-            defaultValue={manufacturerId ?? ""}
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black focus:border-black focus:outline-none"
-          >
-            <option value="">Not set</option>
-            {apparelVendors.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
             Shipping cost (what we pay)
@@ -170,6 +174,31 @@ export function OrderCostForm({
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black placeholder:text-neutral-400 focus:border-black focus:outline-none"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+            Supplies cost
+          </label>
+          <input
+            name="suppliesCost"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={suppliesCost ?? ""}
+            placeholder="0.00"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black placeholder:text-neutral-400 focus:border-black focus:outline-none"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+          Vendor ready by (separate from customer deadline)
+        </label>
+        <input
+          name="vendorReadyBy"
+          type="date"
+          defaultValue={vendorReadyBy ?? ""}
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black focus:border-black focus:outline-none"
+        />
       </div>
       <button
         type="submit"

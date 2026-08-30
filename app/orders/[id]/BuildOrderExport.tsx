@@ -17,7 +17,7 @@ export function BuildOrderExport({
   const handleExport = async () => {
     try {
       const { exportBuildOrder } = await import("@/lib/exportOrders");
-      exportBuildOrder(orderNumber, teamName, lines);
+      await exportBuildOrder(orderNumber, teamName, lines);
       setMessage("");
     } catch {
       setMessage("Download blocked -- try again");

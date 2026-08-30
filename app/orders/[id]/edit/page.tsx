@@ -38,7 +38,7 @@ export default async function EditOrderPage({
       .from("orders")
       .select(
         `id, team_name, contact_name, contact_phone, sport, deadline,
-         shipping_fee, shipping_address, notes, ref_notes, status, rep_id,
+         shipping_fee, shipping_address, notes, status, rep_id,
          order_items(item, mods, qty,
            order_item_sizes(size_label, qty,
              order_item_size_names(player_name, player_number, sort_order)))`,
@@ -68,7 +68,7 @@ export default async function EditOrderPage({
   const isOwnRep = order.rep_id === user.id;
   const canEdit = isManager
     ? order.status !== "cancelled"
-    : isOwnRep && order.status === "submitted";
+    : isOwnRep && (order.status === "submitted" || order.status === "draft");
 
   if (!canEdit) {
     return (
@@ -90,7 +90,6 @@ export default async function EditOrderPage({
     sport: order.sport ?? "",
     deadline: order.deadline ?? "",
     notes: order.notes ?? "",
-    refNotes: order.ref_notes ?? "",
     shippingFee: order.shipping_fee != null ? String(order.shipping_fee) : "",
     shippingAddress: order.shipping_address ?? "",
     items: (order.order_items ?? []).map((li) => ({
@@ -127,6 +126,7 @@ export default async function EditOrderPage({
         customers={customers ?? []}
         mode="edit"
         orderId={order.id}
+        orderStatus={order.status}
         initial={initial}
       />
     </main>

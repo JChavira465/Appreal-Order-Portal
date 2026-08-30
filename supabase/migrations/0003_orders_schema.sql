@@ -374,25 +374,23 @@ create policy "activity_log_insert" on activity_log
 -- Seed price list
 -- ============================================================
 
--- Dummy demo prices -- round numbers, not tuned to any real shop's
--- margins. Replace with your own price list before going live.
 insert into price_items (name, base_price, is_headwear, sort_order) values
-  ('Jersey', 20, false, 10),
-  ('Standard Performance Hoodie', 30, false, 20),
-  ('Cotton Hoodie w/ Embroidery', 35, false, 30),
-  ('Performance Pants', 30, false, 40),
-  ('Poly Sweatpants', 25, false, 50),
-  ('Cotton Sweatpants w/ Embroidery', 30, false, 60),
-  ('Shorts', 20, false, 70),
-  ('BP Jacket / Quarter Zip', 25, false, 80),
-  ('Polo', 25, false, 90),
+  ('Jersey', 16, false, 10),
+  ('Standard Performance Hoodie', 27, false, 20),
+  ('Cotton Hoodie w/ Embroidery', 30, false, 30),
+  ('Performance Pants', 27, false, 40),
+  ('Poly Sweatpants', 26, false, 50),
+  ('Cotton Sweatpants w/ Embroidery', 28, false, 60),
+  ('Shorts', 19, false, 70),
+  ('BP Jacket / Quarter Zip', 23, false, 80),
+  ('Polo', 22, false, 90),
   ('Arm Band', 10, false, 100),
   ('Headband', 10, false, 110),
   ('Team Towel', 10, false, 120),
-  ('Batting Gloves', 20, false, 130),
-  ('Fitted Hat', 25, true, 140),
-  ('Snapback Hat / Visor', 20, true, 150),
-  ('Beanie', 15, true, 160)
+  ('Batting Gloves', 18, false, 130),
+  ('Fitted Hat', 24, true, 140),
+  ('Snapback Hat / Visor', 21, true, 150),
+  ('Beanie', 12, true, 160)
 on conflict (name) do update set
   base_price = excluded.base_price,
   is_headwear = excluded.is_headwear,

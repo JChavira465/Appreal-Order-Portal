@@ -1,4 +1,4 @@
--- Reshapes vendor/cost tracking to match how a real shop actually
+-- Reshapes vendor/cost tracking to match how Prime Apparel actually
 -- assigns work (per the owner's answers): the whole order goes to one
 -- apparel manufacturer, except hat line items, which go to one of two
 -- separate hat vendors. Also adds a per-vendor price list (cost is fixed

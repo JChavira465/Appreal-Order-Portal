@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import {
   advanceStatus,
   cancelOrder,
+  discardDraft,
   reopenOrder,
   type ActionResult,
 } from "./actions";
@@ -54,6 +55,30 @@ export function CancelButton({ orderId }: { orderId: string }) {
         className="w-full rounded-xl border-2 border-red-700 py-3 text-sm font-semibold text-red-700 disabled:opacity-50"
       >
         {pending ? "…" : "Cancel order"}
+      </button>
+      {state && !state.ok && (
+        <p className="mt-2 text-sm text-red-600">{state.message}</p>
+      )}
+    </form>
+  );
+}
+
+export function DiscardDraftButton({ orderId }: { orderId: string }) {
+  const [state, formAction, pending] = useActionState(discardDraft, initialState);
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="orderId" value={orderId} />
+      <button
+        type="submit"
+        disabled={pending}
+        onClick={(e) => {
+          if (!confirm("Discard this draft? It's never been submitted, so this deletes it for good.")) {
+            e.preventDefault();
+          }
+        }}
+        className="w-full rounded-xl border-2 border-red-700 py-3 text-sm font-semibold text-red-700 disabled:opacity-50"
+      >
+        {pending ? "…" : "Discard draft"}
       </button>
       {state && !state.ok && (
         <p className="mt-2 text-sm text-red-600">{state.message}</p>

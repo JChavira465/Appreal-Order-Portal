@@ -46,6 +46,7 @@ export async function addPriceItem(
   const isHeadwear = formData.get("isHeadwear") === "on";
   const sizeGroupRaw = String(formData.get("sizeGroup") ?? "one_size");
   const sizeGroup = isSizeGroup(sizeGroupRaw) ? sizeGroupRaw : "one_size";
+  const category = String(formData.get("category") ?? "").trim().toUpperCase();
 
   if (!name) return { ok: false, message: "Enter an item name." };
   if (isNaN(basePrice) || basePrice < 0) {
@@ -72,6 +73,7 @@ export async function addPriceItem(
     base_price: basePrice,
     is_headwear: isHeadwear,
     size_group: sizeGroup,
+    category: category || null,
     sort_order: sortOrder,
   });
   if (error) return { ok: false, message: "Could not add item." };
@@ -121,6 +123,26 @@ export async function setPriceItemActive(
 
   revalidatePath("/pricing");
   return { ok: true, message: active ? "Item reactivated." : "Item removed." };
+}
+
+export async function updatePriceItemCategory(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const supabase = await requireManager();
+  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+
+  const name = String(formData.get("name") ?? "");
+  const category = String(formData.get("category") ?? "").trim().toUpperCase();
+
+  const { error } = await supabase
+    .from("price_items")
+    .update({ category: category || null })
+    .eq("name", name);
+  if (error) return { ok: false, message: "Could not update category." };
+
+  revalidatePath("/pricing");
+  return { ok: true, message: "Category updated." };
 }
 
 export async function updatePriceItemSizeGroup(

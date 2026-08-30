@@ -2,7 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback"];
+// /track/[id] is the customer-facing status link -- no login, gated only
+// by knowing the order's own (unguessable) id, same trust model as most
+// small-business tracking/invoice links. It reads via the admin client
+// (see app/track/[id]/page.tsx), not the signed-in user's session, so it
+// must stay reachable without a session here.
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/track/"];
+
+// Vercel kills a middleware invocation outright at 25s with a raw 504 --
+// no chance to respond gracefully. Supabase's getUser() call occasionally
+// stalls under heavy concurrent load (real-world usage shouldn't come
+// close, but a deliberate stress test can). Racing it against a shorter
+// timeout means a slow response costs an extra redirect to /login instead
+// of a dead page -- failing closed (treated as "not signed in") rather
+// than skipping the auth check, so this can't be used to bypass it.
+const AUTH_CHECK_TIMEOUT_MS = 8000;
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -26,9 +40,13 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: do not run code between createServerClient and getUser().
   // A simple mistake here can cause the session to randomly log out.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const timeout = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), AUTH_CHECK_TIMEOUT_MS),
+  );
+  const user = await Promise.race([
+    supabase.auth.getUser().then(({ data }) => data.user),
+    timeout,
+  ]);
 
   const path = request.nextUrl.pathname;
   const isPublicPath = PUBLIC_PATHS.some((p) => path.startsWith(p));

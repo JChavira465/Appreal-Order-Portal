@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { createOrder, type CreateOrderResult } from "./new/actions";
 import { updateOrder } from "./[id]/actions";
+import { getRosterTemplate, saveRosterTemplate } from "./roster-template-actions";
+import { checkRecentDuplicate, type RecentDuplicate } from "./duplicate-check-actions";
 import {
   unitPriceFor,
   money,
@@ -46,11 +48,23 @@ type RosterRow = {
   customSize: boolean;
 };
 
+// The simpler alternative to a roster: just a size and how many, no
+// names attached at all -- for things like towels, headbands, or hats
+// that don't get anything printed on the back.
+type SizeQty = {
+  sizeId: string;
+  label: string;
+  qty: string;
+  customSize: boolean;
+};
+
 type ItemLine = {
   lineId: string;
   item: string;
   mods: string[];
+  needsRoster: boolean;
   rows: RosterRow[];
+  sizeQtys: SizeQty[];
 };
 
 const initialState: CreateOrderResult = null;
@@ -148,6 +162,7 @@ function RosterRowFields({
           value={row.number}
           onChange={(e) => onChange({ number: e.target.value })}
           placeholder="#"
+          inputMode="numeric"
           className="w-14 shrink-0 rounded border border-neutral-300 px-2 py-1.5 text-sm text-black placeholder:text-neutral-400"
         />
         {row.customSize ? (
@@ -205,18 +220,22 @@ function RosterEditor({
   rows,
   sizeOptions,
   allowCustomSize,
+  teamName,
   onAdd,
   onChange,
   onRemove,
   onBulkAdd,
+  onReplaceAll,
 }: {
   rows: RosterRow[];
   sizeOptions: string[];
   allowCustomSize: boolean;
+  teamName: string;
   onAdd: () => void;
   onChange: (rowId: string, patch: Partial<RosterRow>) => void;
   onRemove: (rowId: string) => void;
   onBulkAdd: (entries: { name: string; number: string; size: string }[]) => void;
+  onReplaceAll: (rows: RosterRow[]) => void;
 }) {
   // Stays collapsed by default even when rows are already filled in -- a
   // 100-row roster expanded on every visit is exactly the "super busy"
@@ -225,8 +244,48 @@ function RosterEditor({
   const [expanded, setExpanded] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateMessage, setTemplateMessage] = useState("");
   const filled = rows.filter((r) => r.size.trim()).length;
   const bulkEntries = parseRoster(bulkText, sizeOptions);
+
+  const handleLoadTemplate = async () => {
+    if (!teamName.trim()) {
+      setTemplateMessage("Enter a team name first.");
+      return;
+    }
+    setTemplateBusy(true);
+    const entries = await getRosterTemplate(teamName);
+    setTemplateBusy(false);
+    if (entries.length === 0) {
+      setTemplateMessage("No saved roster found for this team.");
+      return;
+    }
+    onReplaceAll(
+      entries.map((e) => ({
+        rowId: crypto.randomUUID(),
+        name: e.name,
+        number: e.number,
+        size: e.size,
+        customSize: e.size !== "" && !sizeOptions.includes(e.size),
+      })),
+    );
+    setTemplateMessage(`Loaded ${entries.length} player${entries.length === 1 ? "" : "s"}.`);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!teamName.trim()) {
+      setTemplateMessage("Enter a team name first.");
+      return;
+    }
+    setTemplateBusy(true);
+    const result = await saveRosterTemplate(
+      teamName,
+      rows.map((r) => ({ name: r.name, number: r.number, size: r.size })),
+    );
+    setTemplateBusy(false);
+    setTemplateMessage(result.message);
+  };
 
   return (
     <div>
@@ -240,13 +299,34 @@ function RosterEditor({
       </button>
       {expanded && (
         <div className="mt-2 space-y-2">
-          <button
-            type="button"
-            onClick={() => setBulkOpen((v) => !v)}
-            className="text-[11px] font-semibold text-black underline"
-          >
-            {bulkOpen ? "Hide paste-a-list" : "Paste a list instead"}
-          </button>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button
+              type="button"
+              onClick={() => setBulkOpen((v) => !v)}
+              className="text-[11px] font-semibold text-black underline"
+            >
+              {bulkOpen ? "Hide paste-a-list" : "Paste a list instead"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLoadTemplate}
+              disabled={templateBusy}
+              className="text-[11px] font-semibold text-black underline disabled:opacity-40"
+            >
+              Load saved roster
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveTemplate}
+              disabled={templateBusy}
+              className="text-[11px] font-semibold text-black underline disabled:opacity-40"
+            >
+              Save this roster
+            </button>
+          </div>
+          {templateMessage && (
+            <p className="text-[11px] text-neutral-500">{templateMessage}</p>
+          )}
           {bulkOpen && (
             <div className="space-y-1 rounded border border-neutral-300 bg-neutral-50 p-2">
               <textarea
@@ -298,6 +378,122 @@ function RosterEditor({
   );
 }
 
+function SizeQtyRow({
+  sizeQty,
+  sizeOptions,
+  allowCustomSize,
+  onChange,
+  onRemove,
+  removeDisabled,
+}: {
+  sizeQty: SizeQty;
+  sizeOptions: string[];
+  allowCustomSize: boolean;
+  onChange: (patch: Partial<SizeQty>) => void;
+  onRemove: () => void;
+  removeDisabled: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+        {sizeQty.customSize ? (
+          <input
+            value={sizeQty.label}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="WxL, e.g. 34x32"
+            className="min-w-0 rounded border border-neutral-300 px-2 py-1.5 text-sm text-black placeholder:text-neutral-400"
+          />
+        ) : (
+          <select
+            value={sizeQty.label}
+            onChange={(e) =>
+              e.target.value === "__custom__"
+                ? onChange({ label: "", customSize: true })
+                : onChange({ label: e.target.value, customSize: false })
+            }
+            className="min-w-0 rounded border border-neutral-300 px-2 py-1.5 text-sm text-black"
+          >
+            <option value="" disabled>
+              Size
+            </option>
+            {sizeOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+            {allowCustomSize && <option value="__custom__">Custom (WxL)</option>}
+          </select>
+        )}
+        <input
+          value={sizeQty.qty}
+          onChange={(e) => onChange({ qty: e.target.value })}
+          type="number"
+          min="1"
+          placeholder="Qty"
+          className="min-w-0 rounded border border-neutral-300 px-2 py-1.5 text-sm text-black placeholder:text-neutral-400"
+        />
+      </div>
+      {sizeQty.customSize && (
+        <button
+          type="button"
+          onClick={() => onChange({ customSize: false, label: "" })}
+          className="shrink-0 text-[10px] font-semibold text-neutral-500 underline"
+        >
+          List
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={removeDisabled}
+        className="shrink-0 text-neutral-400 disabled:opacity-30"
+        aria-label="Remove size"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function SizeQtyEditor({
+  sizeQtys,
+  sizeOptions,
+  allowCustomSize,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  sizeQtys: SizeQty[];
+  sizeOptions: string[];
+  allowCustomSize: boolean;
+  onAdd: () => void;
+  onChange: (sizeId: string, patch: Partial<SizeQty>) => void;
+  onRemove: (sizeId: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {sizeQtys.map((sz) => (
+        <SizeQtyRow
+          key={sz.sizeId}
+          sizeQty={sz}
+          sizeOptions={sizeOptions}
+          allowCustomSize={allowCustomSize}
+          onChange={(patch) => onChange(sz.sizeId, patch)}
+          onRemove={() => onRemove(sz.sizeId)}
+          removeDisabled={sizeQtys.length === 1}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="text-[11px] font-semibold text-black underline"
+      >
+        + Add another size
+      </button>
+    </div>
+  );
+}
+
 function defaultSizeLabel(catalog: Catalog, item: string): string {
   const options = SIZES_BY_GROUP[catalog[item]?.sizeGroup ?? "one_size"];
   return options.length === 1 ? options[0] : "";
@@ -305,6 +501,10 @@ function defaultSizeLabel(catalog: Catalog, item: string): string {
 
 function emptyRow(size = ""): RosterRow {
   return { rowId: crypto.randomUUID(), name: "", number: "", size, customSize: false };
+}
+
+function emptySizeQty(size = ""): SizeQty {
+  return { sizeId: crypto.randomUUID(), label: size, qty: "", customSize: false };
 }
 
 function defaultMods(catalog: Catalog, item: string): string[] {
@@ -316,12 +516,16 @@ function emptyLine(firstItem: string, catalog: Catalog): ItemLine {
     lineId: crypto.randomUUID(),
     item: firstItem,
     mods: defaultMods(catalog, firstItem),
+    needsRoster: true,
     rows: [emptyRow(defaultSizeLabel(catalog, firstItem))],
+    sizeQtys: [emptySizeQty(defaultSizeLabel(catalog, firstItem))],
   };
 }
 
 function lineQty(li: ItemLine): number {
-  return li.rows.filter((r) => r.size.trim()).length;
+  return li.needsRoster
+    ? li.rows.filter((r) => r.size.trim()).length
+    : li.sizeQtys.reduce((s, sz) => s + (parseInt(sz.qty, 10) || 0), 0);
 }
 
 export type OrderFormInitial = {
@@ -331,7 +535,6 @@ export type OrderFormInitial = {
   sport: string;
   deadline: string;
   notes: string;
-  refNotes: string;
   shippingFee: string;
   shippingAddress: string;
   items: {
@@ -350,15 +553,21 @@ export function OrderForm({
   customers,
   mode = "new",
   orderId,
+  orderStatus,
   initial,
 }: {
   catalog: Catalog;
   customers: Customer[];
   mode?: "new" | "edit";
   orderId?: string;
+  orderStatus?: string;
   initial?: OrderFormInitial;
 }) {
   const isEdit = mode === "edit";
+  // A brand-new order can always be saved as a draft. An existing order
+  // can only go back to "draft" behavior if it's still a draft itself --
+  // once it's a real submitted order, there's no drafting it back.
+  const showDraftOption = !isEdit || orderStatus === "draft";
   const itemNames = Object.keys(catalog);
   const [state, formAction, pending] = useActionState(
     isEdit ? updateOrder : createOrder,
@@ -371,7 +580,6 @@ export function OrderForm({
   const [sport, setSport] = useState(initial?.sport ?? SPORTS[0]);
   const [deadline, setDeadline] = useState(initial?.deadline ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [refNotes, setRefNotes] = useState(initial?.refNotes ?? "");
   const [shippingFee, setShippingFee] = useState(initial?.shippingFee ?? "");
   const [shippingAddress, setShippingAddress] = useState(
     initial?.shippingAddress ?? "",
@@ -381,8 +589,10 @@ export function OrderForm({
       ? initial.items.map((li) => {
           const sizeOptions = SIZES_BY_GROUP[catalog[li.item]?.sizeGroup ?? "one_size"];
           const rows: RosterRow[] = [];
+          let anyNames = false;
           for (const sz of li.sizes) {
             const names = sz.names ?? [];
+            if (names.length > 0) anyNames = true;
             const rowCount = Math.max(parseInt(sz.qty, 10) || 0, names.length);
             for (let i = 0; i < rowCount; i++) {
               const n = names[i];
@@ -395,17 +605,39 @@ export function OrderForm({
               });
             }
           }
+          const sizeQtys: SizeQty[] = li.sizes.map((sz) => ({
+            sizeId: crypto.randomUUID(),
+            label: sz.label,
+            qty: sz.qty,
+            customSize: !sizeOptions.includes(sz.label),
+          }));
           return {
             lineId: crypto.randomUUID(),
             item: li.item,
             mods: li.mods,
+            // Loads into whichever mode matches how the data was
+            // actually entered -- if nobody put a name on anything,
+            // there's no reason to default into the busier roster view.
+            needsRoster: anyNames,
             rows: rows.length ? rows : [emptyRow(defaultSizeLabel(catalog, li.item))],
+            sizeQtys: sizeQtys.length
+              ? sizeQtys
+              : [emptySizeQty(defaultSizeLabel(catalog, li.item))],
           };
         })
       : [emptyLine(itemNames[0] ?? "", catalog)],
   );
   const [clientError, setClientError] = useState("");
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [duplicateWarning, setDuplicateWarning] = useState<RecentDuplicate>(null);
+
+  // Non-blocking heads-up, not a hard stop -- a second real order for the
+  // same team within 48h is entirely normal, this just catches accidental
+  // double-entry during a busy intake session.
+  const handleTeamNameBlur = async () => {
+    if (isEdit) return;
+    setDuplicateWarning(await checkRecentDuplicate(teamName));
+  };
 
   useEffect(() => {
     return () => {
@@ -488,6 +720,9 @@ export function OrderForm({
       rows.length > 1 ? rows.filter((r) => r.rowId !== rowId) : rows,
     );
 
+  const replaceRows = (lineId: string, rows: RosterRow[]) =>
+    setItemField(lineId, { rows });
+
   const setRowField = (lineId: string, rowId: string, patch: Partial<RosterRow>) =>
     mapRows(lineId, (rows) =>
       rows.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r)),
@@ -507,6 +742,35 @@ export function OrderForm({
         customSize: false,
       })),
     ]);
+
+  const setNeedsRoster = (lineId: string, needsRoster: boolean) =>
+    setItemField(lineId, { needsRoster });
+
+  const mapSizeQtys = (lineId: string, fn: (sizeQtys: SizeQty[]) => SizeQty[]) =>
+    setItems((list) =>
+      list.map((li) =>
+        li.lineId === lineId ? { ...li, sizeQtys: fn(li.sizeQtys) } : li,
+      ),
+    );
+
+  const addSizeQty = (lineId: string) =>
+    setItems((list) =>
+      list.map((li) =>
+        li.lineId === lineId
+          ? { ...li, sizeQtys: [...li.sizeQtys, emptySizeQty()] }
+          : li,
+      ),
+    );
+
+  const removeSizeQty = (lineId: string, sizeId: string) =>
+    mapSizeQtys(lineId, (sizeQtys) =>
+      sizeQtys.length > 1 ? sizeQtys.filter((sz) => sz.sizeId !== sizeId) : sizeQtys,
+    );
+
+  const setSizeQtyField = (lineId: string, sizeId: string, patch: Partial<SizeQty>) =>
+    mapSizeQtys(lineId, (sizeQtys) =>
+      sizeQtys.map((sz) => (sz.sizeId === sizeId ? { ...sz, ...patch } : sz)),
+    );
 
   const loadCustomer = (customerId: string) => {
     const c = customers.find((x) => x.id === customerId);
@@ -531,6 +795,20 @@ export function OrderForm({
 
   const itemsJson = JSON.stringify(
     items.map((li) => {
+      if (!li.needsRoster) {
+        // Sizes-only mode -- no names to attach, just a qty per size.
+        return {
+          item: li.item,
+          mods: li.mods,
+          sizes: li.sizeQtys
+            .filter((sz) => sz.label.trim() && (parseInt(sz.qty, 10) || 0) > 0)
+            .map((sz) => ({
+              label: sz.label.trim(),
+              qty: parseInt(sz.qty, 10) || 0,
+              names: [],
+            })),
+        };
+      }
       // Each roster row is one piece; group by size label to get the
       // qty-per-size + names-per-size shape the rest of the app expects
       // (order_item_sizes / order_item_size_names).
@@ -560,7 +838,22 @@ export function OrderForm({
     }),
   );
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | null;
+    const savingDraft = submitter?.value === "draft";
+
+    if (savingDraft) {
+      if (!teamName.trim()) {
+        e.preventDefault();
+        setClientError("At least a team name is needed to save a draft.");
+        return;
+      }
+      setClientError("");
+      return;
+    }
+
     if (!teamName.trim() || !deadline) {
       e.preventDefault();
       setClientError("Team name and deadline are required.");
@@ -611,9 +904,16 @@ export function OrderForm({
             name="teamName"
             value={teamName}
             onChange={(e) => setTeamName(e.target.value)}
+            onBlur={handleTeamNameBlur}
             placeholder="e.g. Katy Tigers 12U"
             className={inputClass}
           />
+          {duplicateWarning && (
+            <p className="mt-1.5 text-xs font-semibold text-amber-700">
+              Heads up — {teamName} already has order #{duplicateWarning.orderNumber}{" "}
+              submitted recently. Make sure this isn&apos;t a duplicate.
+            </p>
+          )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Contact name">
@@ -631,6 +931,8 @@ export function OrderForm({
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
               placeholder="(281) 555-0100"
+              type="tel"
+              inputMode="tel"
               className={inputClass}
             />
           </Field>
@@ -711,6 +1013,7 @@ export function OrderForm({
                         item: e.target.value,
                         mods: defaultMods(catalog, e.target.value),
                         rows: [emptyRow(defaultSizeLabel(catalog, e.target.value))],
+                        sizeQtys: [emptySizeQty(defaultSizeLabel(catalog, e.target.value))],
                       })
                     }
                     className={inputClass}
@@ -795,17 +1098,61 @@ export function OrderForm({
 
                 <div className="mt-3 border-t border-neutral-100 pt-3">
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    Names, numbers &amp; sizes for this block
+                    {li.needsRoster
+                      ? "Names, numbers & sizes for this block"
+                      : "Sizes & quantities for this block"}
                   </label>
-                  <RosterEditor
-                    rows={li.rows}
-                    sizeOptions={SIZES_BY_GROUP[cat?.sizeGroup ?? "one_size"]}
-                    allowCustomSize={cat?.sizeGroup === "bottoms"}
-                    onAdd={() => addRow(li.lineId)}
-                    onChange={(rowId, patch) => setRowField(li.lineId, rowId, patch)}
-                    onRemove={(rowId) => removeRow(li.lineId, rowId)}
-                    onBulkAdd={(entries) => addRowsBulk(li.lineId, entries)}
-                  />
+                  <div className="mb-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNeedsRoster(li.lineId, true)}
+                      className="rounded-lg py-3 text-sm font-bold"
+                      style={{
+                        background: li.needsRoster ? "#111" : "#F5F5F5",
+                        color: li.needsRoster ? "#fff" : "#666",
+                      }}
+                    >
+                      Roster
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNeedsRoster(li.lineId, false)}
+                      className="rounded-lg py-3 text-sm font-bold"
+                      style={{
+                        background: !li.needsRoster ? "#111" : "#F5F5F5",
+                        color: !li.needsRoster ? "#fff" : "#666",
+                      }}
+                    >
+                      Sizes only
+                    </button>
+                  </div>
+                  {li.needsRoster ? (
+                    <RosterEditor
+                      rows={li.rows}
+                      sizeOptions={SIZES_BY_GROUP[cat?.sizeGroup ?? "one_size"]}
+                      allowCustomSize={cat?.sizeGroup === "bottoms"}
+                      teamName={teamName}
+                      onAdd={() => addRow(li.lineId)}
+                      onChange={(rowId, patch) => setRowField(li.lineId, rowId, patch)}
+                      onRemove={(rowId) => removeRow(li.lineId, rowId)}
+                      onBulkAdd={(entries) => addRowsBulk(li.lineId, entries)}
+                      onReplaceAll={(rows) => replaceRows(li.lineId, rows)}
+                    />
+                  ) : (
+                    <SizeQtyEditor
+                      sizeQtys={li.sizeQtys}
+                      sizeOptions={SIZES_BY_GROUP[cat?.sizeGroup ?? "one_size"]}
+                      allowCustomSize={cat?.sizeGroup === "bottoms"}
+                      onAdd={() => addSizeQty(li.lineId)}
+                      onChange={(sizeId, patch) => setSizeQtyField(li.lineId, sizeId, patch)}
+                      onRemove={(sizeId) => removeSizeQty(li.lineId, sizeId)}
+                    />
+                  )}
+                  <p className="mt-1.5 text-[11px] text-neutral-400">
+                    {li.needsRoster
+                      ? "Use this when players want a name/number on the back."
+                      : "Use this for plain items -- nothing printed on the back, just sizes and how many."}
+                  </p>
                 </div>
 
                 {cat?.isHeadwear && qty > 0 && qty < HAT_MIN && (
@@ -837,48 +1184,36 @@ export function OrderForm({
         </button>
       </div>
 
-      <div className="mt-6 border-t border-neutral-100 pt-5">
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
-          Design reference (what the customer gave you)
-        </h3>
-        <Field label="Design direction">
-          <textarea
-            name="refNotes"
-            value={refNotes}
-            onChange={(e) => setRefNotes(e.target.value)}
-            placeholder="Navy/gold, tiger logo on left chest, player name + number on back, wants it like last year's but with the new sponsor…"
-            className={`min-h-[70px] ${inputClass}`}
-          />
-        </Field>
-
-        {!isEdit && (
-          <div className="mt-3">
-            <Field label="Reference photos">
-              <input
-                name="referenceImages"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleReferenceFilesChange}
-                className="w-full text-sm text-black file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-black"
-              />
-            </Field>
-            {previewUrls.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {previewUrls.map((url, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={url}
-                    alt=""
-                    className="h-16 w-16 rounded-lg border border-neutral-200 object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {!isEdit && (
+        <div className="mt-6 border-t border-neutral-100 pt-5">
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
+            Reference photos
+          </h3>
+          <Field label="Reference photos">
+            <input
+              name="referenceImages"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleReferenceFilesChange}
+              className="w-full text-sm text-black file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-black"
+            />
+          </Field>
+          {previewUrls.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {previewUrls.map((url, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={url}
+                  alt=""
+                  className="h-16 w-16 rounded-lg border border-neutral-200 object-cover"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 space-y-4">
         <Field label="Notes">
@@ -933,13 +1268,31 @@ export function OrderForm({
 
       <input type="hidden" name="itemsJson" value={itemsJson} readOnly />
 
+      {showDraftOption && (
+        <button
+          type="submit"
+          name="intent"
+          value="draft"
+          disabled={pending}
+          className="mt-5 w-full rounded-xl border-2 border-neutral-300 py-3.5 text-base font-bold text-black disabled:opacity-50"
+        >
+          {pending ? "Saving…" : "Save draft"}
+        </button>
+      )}
       <button
         type="submit"
+        name="intent"
+        value="submit"
         disabled={pending}
-        className="mt-5 w-full rounded-xl bg-black px-4 py-3.5 text-base font-bold text-white transition-opacity disabled:opacity-50"
+        className={`w-full rounded-xl bg-black px-4 py-3.5 text-base font-bold text-white transition-opacity disabled:opacity-50 ${showDraftOption ? "mt-2" : "mt-5"}`}
       >
         {pending ? "Saving…" : isEdit ? "Save changes" : "Submit order"}
       </button>
+      {showDraftOption && (
+        <p className="mt-2 text-center text-[11px] text-neutral-400">
+          A draft is only visible to you until you submit it.
+        </p>
+      )}
       {isEdit && orderId && (
         <Link
           href={`/orders/${orderId}`}

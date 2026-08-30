@@ -70,15 +70,23 @@ export async function setOrderCosts(
   const manufacturerId = String(formData.get("manufacturerId") ?? "").trim();
   const shippingCostRaw = String(formData.get("shippingCost") ?? "").trim();
   const shippingCost = shippingCostRaw === "" ? null : Number(shippingCostRaw);
+  const suppliesCostRaw = String(formData.get("suppliesCost") ?? "").trim();
+  const suppliesCost = suppliesCostRaw === "" ? null : Number(suppliesCostRaw);
+  const vendorReadyBy = String(formData.get("vendorReadyBy") ?? "").trim();
 
   if (shippingCost !== null && (isNaN(shippingCost) || shippingCost < 0)) {
     return { ok: false, message: "Enter a valid shipping cost." };
+  }
+  if (suppliesCost !== null && (isNaN(suppliesCost) || suppliesCost < 0)) {
+    return { ok: false, message: "Enter a valid supplies cost." };
   }
 
   const { error } = await supabase.from("order_costs").upsert({
     order_id: orderId,
     manufacturer_id: manufacturerId || null,
     shipping_cost: shippingCost,
+    supplies_cost: suppliesCost,
+    vendor_ready_by: vendorReadyBy || null,
   });
   if (error) return { ok: false, message: "Could not save order costs." };
 

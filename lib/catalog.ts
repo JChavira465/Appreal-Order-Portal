@@ -13,6 +13,7 @@ export type PriceItem = {
   name: string;
   basePrice: number;
   isHeadwear: boolean;
+  category: string | null;
   sizeGroup: SizeGroup;
   modifiers: PriceModifier[];
 };
@@ -22,10 +23,13 @@ export type Catalog = Record<string, PriceItem>;
 export const HAT_MIN = 10;
 
 export async function loadCatalog(supabase: SupabaseClient): Promise<Catalog> {
-  const [{ data: items }, { data: mods }] = await Promise.all([
+  const [
+    { data: items, error: itemsError },
+    { data: mods, error: modsError },
+  ] = await Promise.all([
     supabase
       .from("price_items")
-      .select("name, base_price, is_headwear, size_group, sort_order")
+      .select("name, base_price, is_headwear, category, size_group, sort_order")
       .eq("active", true)
       .order("sort_order"),
     supabase
@@ -33,12 +37,20 @@ export async function loadCatalog(supabase: SupabaseClient): Promise<Catalog> {
       .select("item_name, key, label, price, group_key, is_default"),
   ]);
 
+  // A silently-empty catalog looks like "no items exist" everywhere it's
+  // used (New Order's item dropdown shows "No Options" with no other
+  // sign anything's wrong) -- surface the real error instead so a
+  // missing migration/column shows up immediately, not as a mystery.
+  if (itemsError) console.error("loadCatalog: price_items query failed", itemsError);
+  if (modsError) console.error("loadCatalog: price_modifiers query failed", modsError);
+
   const catalog: Catalog = {};
   for (const item of items ?? []) {
     catalog[item.name] = {
       name: item.name,
       basePrice: Number(item.base_price),
       isHeadwear: item.is_headwear,
+      category: item.category ?? null,
       sizeGroup: isSizeGroup(item.size_group) ? item.size_group : "one_size",
       modifiers: [],
     };

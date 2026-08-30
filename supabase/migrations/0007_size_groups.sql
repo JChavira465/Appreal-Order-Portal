@@ -1,6 +1,6 @@
 -- Constrains size selection to a fixed list per item (a "size group"),
 -- so reps pick from a dropdown instead of typing a size label -- keeps
--- every order's sizing uniform and matches this shop's actual size
+-- every order's sizing uniform and matches Prime Apparel's actual size
 -- charts (tops, bottoms, fitted hats). The size label lists themselves
 -- live in code (lib/sizes.ts), not the database -- they're fixed
 -- reference data, not something that needs its own admin UI yet.

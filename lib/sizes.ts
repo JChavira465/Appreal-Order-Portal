@@ -9,8 +9,8 @@ export const SIZE_GROUP_LABELS: Record<SizeGroup, string> = {
   one_size: "One size",
 };
 
-// Example size charts, youth first then adult, matching
-// the order reps read a chart in.
+// Standard apparel size charts, youth first then adult, matching the
+// order reps read a chart in.
 export const SIZES_BY_GROUP: Record<SizeGroup, string[]> = {
   tops: [
     "YXS",

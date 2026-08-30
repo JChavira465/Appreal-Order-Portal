@@ -13,6 +13,14 @@ const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
 };
 
+function daysUntil(dateStr: string): number | null {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86400000);
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
@@ -26,12 +34,13 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role")
+    .select("full_name, role, orders_viewed_at, platform_admin")
     .eq("id", user.id)
     .single();
 
   const isManager = profile?.role === "manager" || profile?.role === "super_admin";
   const isSuperAdmin = profile?.role === "super_admin";
+  const isPlatformAdmin = profile?.platform_admin === true;
   const displayName = profile?.full_name || user.email;
   const roleLabel = profile?.role
     ? (ROLE_LABEL[profile.role] ?? profile.role)
@@ -53,10 +62,41 @@ export default async function HomePage() {
         .order("full_name")
     : { data: null };
 
+  // RLS already scopes this to "my orders" for a rep and "all orders" for
+  // a manager, same as the Order Board -- no extra filter needed here.
+  const { data: deadlineOrders } = await supabase
+    .from("orders")
+    .select("deadline, status")
+    .not("deadline", "is", null);
+  const activeDeadlines = (deadlineOrders ?? []).filter(
+    (o) => !["draft", "cancelled", "shipped"].includes(o.status),
+  );
+  const overdueCount = activeDeadlines.filter(
+    (o) => (daysUntil(o.deadline!) ?? 0) < 0,
+  ).length;
+  const dueSoonCount = activeDeadlines.filter((o) => {
+    const d = daysUntil(o.deadline!);
+    return d !== null && d >= 0 && d <= 7;
+  }).length;
+
+  // Orders submitted by anyone else since this manager last visited the
+  // Order Board (which stamps orders_viewed_at -- see app/orders/page.tsx).
+  // Reps don't get this: they already know what they just submitted.
+  let newOrderCount = 0;
+  if (isManager && profile?.orders_viewed_at) {
+    const { data: newOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .neq("status", "draft")
+      .neq("rep_id", user.id)
+      .gt("created_at", profile.orders_viewed_at);
+    newOrderCount = newOrders?.length ?? 0;
+  }
+
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12">
       <div className="w-full max-w-sm text-center">
-        <h1 className="font-script mb-8 text-4xl text-black">Acme Apparel Co.</h1>
+        <h1 className="font-script mb-8 text-4xl text-black">Prime Apparel</h1>
 
         <div className="rounded-xl border border-neutral-200 px-6 py-8">
           <p className="text-sm text-neutral-500">Signed in as</p>
@@ -65,6 +105,34 @@ export default async function HomePage() {
             {roleLabel}
           </span>
         </div>
+
+        {newOrderCount > 0 && (
+          <Link
+            href="/orders"
+            className="mt-4 block rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm font-semibold text-blue-800"
+          >
+            {newOrderCount} new order{newOrderCount === 1 ? "" : "s"} submitted
+            since you last checked
+          </Link>
+        )}
+
+        {(overdueCount > 0 || dueSoonCount > 0) && (
+          <Link
+            href="/orders"
+            className="mt-4 block rounded-lg border px-4 py-3 text-left text-sm font-semibold"
+            style={{
+              borderColor: overdueCount > 0 ? "#FCA5A5" : "#FDE68A",
+              background: overdueCount > 0 ? "#FEF2F2" : "#FFFBEB",
+              color: overdueCount > 0 ? "#B42318" : "#B45309",
+            }}
+          >
+            {overdueCount > 0 &&
+              `${overdueCount} order${overdueCount === 1 ? "" : "s"} overdue`}
+            {overdueCount > 0 && dueSoonCount > 0 && " · "}
+            {dueSoonCount > 0 &&
+              `${dueSoonCount} due within 7 days`}
+          </Link>
+        )}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <Link
@@ -81,32 +149,77 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        {isManager && (
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <Link
-            href="/pricing"
-            className="mt-3 block rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            href="/activity"
+            className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
           >
-            Pricing
+            Activity
           </Link>
-        )}
 
-        {isManager && (
-          <Link
-            href="/vendors"
-            className="mt-3 block rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-          >
-            Vendors
-          </Link>
-        )}
+          {isManager && (
+            <Link
+              href="/pricing"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Pricing
+            </Link>
+          )}
 
-        {isSuperAdmin && (
-          <Link
-            href="/company"
-            className="mt-3 block rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-          >
-            Company
-          </Link>
-        )}
+          {isManager && (
+            <Link
+              href="/vendors"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Vendors
+            </Link>
+          )}
+
+          {isManager && (
+            <Link
+              href="/customers"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Customers
+            </Link>
+          )}
+
+          {isManager && (
+            <Link
+              href="/reports"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Reports
+            </Link>
+          )}
+
+          {isManager && (
+            <Link
+              href="/hats"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Hat Orders
+            </Link>
+          )}
+
+          {isSuperAdmin && (
+            <Link
+              href="/company"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Company
+            </Link>
+          )}
+
+          {isPlatformAdmin && (
+            <Link
+              href="/issues"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Issues
+            </Link>
+          )}
+        </div>
 
         <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
           <PinForm />

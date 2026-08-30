@@ -4,9 +4,10 @@
 -- floor) must not see this, which is exactly why it's gated to
 -- is_super_admin() rather than is_manager() everywhere below.
 
--- Fixed profit-split percentages between the owner and his partners
--- (e.g. Partner A 60%, Partner B 40%). Configurable
--- here rather than hardcoded, since splits can change.
+-- Fixed profit-split percentages between the owner and any partners
+-- (e.g. two partners at 50/50, or three at uneven percentages).
+-- Configurable here rather than hardcoded, since splits can change and
+-- vary company to company.
 create table if not exists partner_splits (
   id uuid primary key default gen_random_uuid(),
   name text not null,
