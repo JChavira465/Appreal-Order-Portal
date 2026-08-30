@@ -1,7 +1,5 @@
 -- Vendor/manufacturer tracking + true cost, for per-order profit
--- calculation (Steve's requirements: assign a manufacturer or hat guy
--- per line item, track what Prime Apparel actually pays, know profit
--- per order).
+-- calculation.
 --
 -- Cost and vendor assignment are manager-only end to end. Deliberately
 -- NOT columns on orders/order_items: Postgres RLS is row-level, not
@@ -56,7 +54,7 @@ create trigger order_item_costs_touch_updated_at
   before update on order_item_costs
   for each row execute function touch_updated_at();
 
--- One row per order carrying what Prime Apparel pays to ship from the
+-- One row per order carrying what the shop pays to ship from the
 -- vendor -- separate from orders.shipping_fee, which is what the
 -- customer is charged.
 create table if not exists order_costs (
