@@ -1,7 +1,7 @@
--- Reshapes vendor/cost tracking to match how Prime Apparel actually
--- assigns work (per the owner's answers): the whole order goes to one
--- apparel manufacturer, except hat line items, which go to one of two
--- separate hat vendors. Also adds a per-vendor price list (cost is fixed
+-- Reshapes vendor/cost tracking to match how a shop typically assigns
+-- work: the whole order goes to one apparel manufacturer, except hat
+-- line items, which go to one of two separate hat vendors. Also adds a
+-- per-vendor price list (cost is fixed
 -- per item per manufacturer, with the occasional bulk-order discount
 -- entered manually as before) so entering a line's cost isn't fully
 -- manual every single time.
