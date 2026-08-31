@@ -1,9 +1,9 @@
 -- A broader grouping above the specific item name (e.g. "JERSEY" as a
 -- category, vs. "Jersey" the specific item; "BOTTOMS" as a category
 -- covering Performance Pants/Poly Sweatpants/Shorts as specific items).
--- Free text, not an enum -- the owner's own real category list doesn't
--- cleanly enumerate (it has some inconsistent entries), and a manager
--- should be able to type a new one without a migration. Purely
+-- Free text, not an enum -- a real shop's category list doesn't always
+-- cleanly enumerate (it can have some inconsistent entries), and a
+-- manager should be able to type a new one without a migration. Purely
 -- informational/reporting -- nothing in pricing or order entry depends
 -- on it.
 

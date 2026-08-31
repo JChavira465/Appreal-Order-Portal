@@ -1,5 +1,5 @@
--- Two of the owner's requests turn out to be the same underlying gap:
--- some add-ons aren't independent toggles, they're a single choice among
+-- Two common requests turn out to be the same underlying gap: some
+-- add-ons aren't independent toggles, they're a single choice among
 -- a few options. "Full Mesh/Meshback" was one checkbox that couldn't say
 -- which of the two it was -- now it's two mutually-exclusive options,
 -- selecting neither meaning plain fabric (no default). Collar is a new
