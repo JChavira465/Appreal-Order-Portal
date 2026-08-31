@@ -112,7 +112,7 @@ export default async function OrderReceiptPage({
       </div>
 
       <div className="text-center">
-        <h1 className="font-script text-3xl text-black">Prime Apparel</h1>
+        <h1 className="font-script text-3xl text-black">Order Desk</h1>
         <p className="mt-1 text-sm text-neutral-500">Order Receipt</p>
       </div>
 
@@ -234,7 +234,7 @@ export default async function OrderReceiptPage({
 
       <p className="mt-8 text-center text-xs text-neutral-400">
         Thanks for your order — questions? Reach out to whoever you&apos;ve
-        been working with at Prime Apparel.
+        been working with on this order.
       </p>
     </main>
   );

@@ -58,7 +58,7 @@ export default async function TrackPage({
   if (!order) {
     return (
       <main className="mx-auto max-w-lg px-5 py-10 text-center">
-        <h1 className="font-script text-3xl text-black">Prime Apparel</h1>
+        <h1 className="font-script text-3xl text-black">Order Desk</h1>
         <p className="mt-6 text-sm text-neutral-400">
           We couldn&apos;t find that order. Double check the link.
         </p>
@@ -82,7 +82,7 @@ export default async function TrackPage({
   return (
     <main className="mx-auto max-w-lg px-5 py-10">
       <div className="text-center">
-        <h1 className="font-script text-3xl text-black">Prime Apparel</h1>
+        <h1 className="font-script text-3xl text-black">Order Desk</h1>
         <p className="mt-1 text-sm text-neutral-500">Order Status</p>
       </div>
 
@@ -189,8 +189,8 @@ export default async function TrackPage({
       )}
 
       <p className="mt-8 text-center text-xs text-neutral-400">
-        Questions? Reach out to whoever you&apos;ve been working with at
-        Prime Apparel.
+        Questions? Reach out to whoever you&apos;ve been working with on
+        this order.
       </p>
     </main>
   );

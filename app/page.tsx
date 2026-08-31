@@ -96,7 +96,7 @@ export default async function HomePage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12">
       <div className="w-full max-w-sm text-center">
-        <h1 className="font-script mb-8 text-4xl text-black">Prime Apparel</h1>
+        <h1 className="font-script mb-8 text-4xl text-black">Order Desk</h1>
 
         <div className="rounded-xl border border-neutral-200 px-6 py-8">
           <p className="text-sm text-neutral-500">Signed in as</p>
