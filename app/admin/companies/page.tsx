@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateCompanyForm } from "./CreateCompanyForm";
+import { DeleteCompanyButton } from "./DeleteCompanyButton";
 
 export default async function AdminCompaniesPage() {
   const supabase = await createClient();
@@ -80,6 +81,7 @@ export default async function AdminCompaniesPage() {
               <div className="mt-1 text-xs text-neutral-500">
                 /login?company={c.slug}
               </div>
+              <DeleteCompanyButton companyId={c.id} companyName={c.name} />
             </div>
           ))}
         </div>

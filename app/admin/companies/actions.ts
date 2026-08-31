@@ -126,3 +126,60 @@ export async function createCompany(
     message: `${companyName} created. ${ownerName} signs in at /login?company=${company.slug} with their PIN.`,
   };
 }
+
+export type DeleteCompanyResult = { ok: boolean; message: string };
+
+// Deliberately not a full cascading delete. Every tenant table's
+// company_id foreign key (orders, vendors, customers, price_items,
+// etc.) has no ON DELETE behavior specified, so it defaults to blocking
+// the company delete outright if any of that data still exists -- that
+// safety net is intentional, not a bug, and this action never overrides
+// it. Wiping a company that already has real order/customer history is
+// a much bigger, more deliberate action than a single button should be
+// -- if that's ever actually needed, it wants its own explicit
+// conversation, not a UI shortcut here.
+//
+// Staff accounts are the one exception: a company created through this
+// same UI always has at least its owner's profile attached, so without
+// removing staff first, "delete a company I just made by mistake" could
+// never succeed even for a company with zero real business data. Staff
+// (auth.users, which cascades to their profiles row per 0001) are
+// removed here before the company row -- if that still leaves orders/
+// vendors/customers behind, the delete correctly fails below.
+export async function deleteCompany(
+  companyId: string,
+): Promise<DeleteCompanyResult> {
+  const { supabase, isPlatformAdmin } = await requirePlatformAdmin();
+  if (!isPlatformAdmin) {
+    return { ok: false, message: "Only the platform admin can do this." };
+  }
+
+  const admin = createAdminClient();
+  const { data: staff } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("company_id", companyId);
+
+  for (const person of staff ?? []) {
+    await admin.auth.admin.deleteUser(person.id);
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .delete()
+    .eq("id", companyId);
+
+  if (error) {
+    if (error.code === "23503") {
+      return {
+        ok: false,
+        message:
+          "This company still has orders, vendors, or other business data attached -- that needs a deliberate cleanup, not a quick delete.",
+      };
+    }
+    return { ok: false, message: "Could not delete the company." };
+  }
+
+  revalidatePath("/admin/companies");
+  return { ok: true, message: "Company deleted." };
+}
