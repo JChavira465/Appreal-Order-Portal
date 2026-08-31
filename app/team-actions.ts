@@ -21,20 +21,20 @@ async function currentUser() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { supabase, userId: null, role: null };
+  if (!user) return { supabase, userId: null, role: null, companyId: null };
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", user.id)
     .single();
 
-  return { supabase, userId: user.id, role: profile?.role ?? null };
-}
-
-async function currentRole(): Promise<string | null> {
-  const { role } = await currentUser();
-  return role;
+  return {
+    supabase,
+    userId: user.id,
+    role: profile?.role ?? null,
+    companyId: profile?.company_id ?? null,
+  };
 }
 
 // A regular manager may only touch reps; super_admin may touch anyone.
@@ -50,6 +50,7 @@ async function createStaffAccount(
   fullName: string,
   pin: string,
   role: "rep" | "manager",
+  companyId: string | null,
 ): Promise<AddStaffResult> {
   if (!fullName) {
     return { ok: false, message: "Enter a name." };
@@ -57,12 +58,15 @@ async function createStaffAccount(
   if (!/^\d{4}$/.test(pin)) {
     return { ok: false, message: "PIN must be 4 digits." };
   }
+  if (!companyId) {
+    return { ok: false, message: "Your own account isn't assigned to a company." };
+  }
 
   const slug = slugify(fullName);
   if (!slug) {
     return { ok: false, message: "Enter a valid name." };
   }
-  const loginEmail = `${role}-${slug}-${randomUUID().slice(0, 8)}@staff.primeapparel.internal`;
+  const loginEmail = `${role}-${slug}-${randomUUID().slice(0, 8)}@staff.internal`;
 
   const admin = createAdminClient();
   const { data: created, error: createError } =
@@ -77,18 +81,25 @@ async function createStaffAccount(
     return { ok: false, message: "Could not create account. Try a different name." };
   }
 
-  if (role === "manager") {
-    const { error: updateError } = await admin
-      .from("profiles")
-      .update({ full_name: fullName, role: "manager" })
-      .eq("id", created.user.id);
+  // handle_new_user() (0001) only sets full_name from signup metadata --
+  // it has no way to know which company is doing the inviting, so every
+  // new account needs company_id (and, for a manager, role) filled in
+  // here as a follow-up update, using the *inviting* user's own company,
+  // never anything client-supplied.
+  const { error: updateError } = await admin
+    .from("profiles")
+    .update({
+      full_name: fullName,
+      company_id: companyId,
+      ...(role === "manager" ? { role: "manager" } : {}),
+    })
+    .eq("id", created.user.id);
 
-    if (updateError) {
-      return {
-        ok: false,
-        message: "Account created but setup was incomplete. Try again.",
-      };
-    }
+  if (updateError) {
+    return {
+      ok: false,
+      message: "Account created but setup was incomplete. Try again.",
+    };
   }
 
   revalidatePath("/");
@@ -99,28 +110,28 @@ export async function addRep(
   _prevState: AddStaffResult,
   formData: FormData,
 ): Promise<AddStaffResult> {
-  const role = await currentRole();
+  const { role, companyId } = await currentUser();
   if (role !== "manager" && role !== "super_admin") {
     return { ok: false, message: "Only a manager can add reps." };
   }
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
-  return createStaffAccount(fullName, pin, "rep");
+  return createStaffAccount(fullName, pin, "rep", companyId);
 }
 
 export async function addManager(
   _prevState: AddStaffResult,
   formData: FormData,
 ): Promise<AddStaffResult> {
-  const role = await currentRole();
+  const { role, companyId } = await currentUser();
   if (role !== "super_admin") {
     return { ok: false, message: "Only the super admin can add managers." };
   }
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
-  return createStaffAccount(fullName, pin, "manager");
+  return createStaffAccount(fullName, pin, "manager", companyId);
 }
 
 export type UpdateStaffResult = { ok: boolean; message: string } | null;
@@ -136,19 +147,26 @@ export async function renameStaff(
     return { ok: false, message: "Enter a name." };
   }
 
-  const { supabase, userId, role } = await currentUser();
+  const { supabase, userId, role, companyId } = await currentUser();
   if (!userId) {
     return { ok: false, message: "Not signed in." };
   }
 
+  // The admin client bypasses RLS for this lookup, so the company check
+  // has to happen explicitly here -- canManage only knows about role
+  // hierarchy, nothing about which company a target belongs to.
   const admin = createAdminClient();
   const { data: target } = await admin
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", targetId)
     .single();
 
-  if (!target || !canManage(role, target.role)) {
+  if (
+    !target ||
+    target.company_id !== companyId ||
+    !canManage(role, target.role)
+  ) {
     return { ok: false, message: "Not allowed." };
   }
 
@@ -176,7 +194,7 @@ export async function setStaffActive(
     return { ok: false, message: "Missing id." };
   }
 
-  const { supabase, userId, role } = await currentUser();
+  const { supabase, userId, role, companyId } = await currentUser();
   if (!userId) {
     return { ok: false, message: "Not signed in." };
   }
@@ -187,11 +205,11 @@ export async function setStaffActive(
   const admin = createAdminClient();
   const { data: target } = await admin
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", targetId)
     .single();
 
-  if (!target) {
+  if (!target || target.company_id !== companyId) {
     return { ok: false, message: "Not found." };
   }
   if (target.role === "super_admin") {
