@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateCompanyForm } from "./CreateCompanyForm";
 import { DeleteCompanyButton } from "./DeleteCompanyButton";
+import { SuspendCompanyButton } from "./SuspendCompanyButton";
 
 export default async function AdminCompaniesPage() {
   const supabase = await createClient();
@@ -75,12 +76,19 @@ export default async function AdminCompaniesPage() {
                   {c.name}
                 </span>
                 {!c.active && (
-                  <span className="text-xs text-neutral-400">Inactive</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    Suspended
+                  </span>
                 )}
               </div>
               <div className="mt-1 text-xs text-neutral-500">
                 /login?company={c.slug}
               </div>
+              <SuspendCompanyButton
+                companyId={c.id}
+                companyName={c.name}
+                active={c.active}
+              />
               <DeleteCompanyButton companyId={c.id} companyName={c.name} />
             </div>
           ))}

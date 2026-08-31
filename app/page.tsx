@@ -34,9 +34,45 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role, orders_viewed_at, platform_admin")
+    .select("full_name, role, orders_viewed_at, platform_admin, company_id")
     .eq("id", user.id)
     .single();
+
+  if (profile?.company_id) {
+    // companies_select's RLS lets a member see their own company row
+    // regardless of active status (see 0032), specifically so this check
+    // can render a clear message instead of every other query on this
+    // page just silently coming back empty with no explanation.
+    const { data: company } = await supabase
+      .from("companies")
+      .select("name, active")
+      .eq("id", profile.company_id)
+      .single();
+
+    if (company && !company.active) {
+      return (
+        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
+          <div className="w-full max-w-sm">
+            <h1 className="mb-4 text-lg font-bold text-black">
+              Account suspended
+            </h1>
+            <p className="text-sm text-neutral-500">
+              {company.name}&apos;s account is currently suspended. Contact
+              the platform admin to resolve this.
+            </p>
+            <form action={signOut} className="mt-8">
+              <button
+                type="submit"
+                className="text-xs text-neutral-400 underline"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </main>
+      );
+    }
+  }
 
   const isManager = profile?.role === "manager" || profile?.role === "super_admin";
   const isSuperAdmin = profile?.role === "super_admin";

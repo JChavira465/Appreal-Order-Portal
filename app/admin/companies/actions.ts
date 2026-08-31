@@ -127,6 +127,38 @@ export async function createCompany(
   };
 }
 
+export type SetCompanyActiveResult = { ok: boolean; message: string };
+
+// Suspending is the "debt isn't settled yet" lever -- unlike delete, it's
+// instant and fully reversible. current_company_id() (0032) returns null
+// for every one of this company's members the moment active is false,
+// which every RLS policy in the app compares company_id against -- so
+// this one row flip locks out every operational table immediately,
+// without touching any of those policies individually. Existing sessions
+// aren't revoked (staff stay "signed in"), they just can't see or touch
+// any of their company's data anymore until reactivated.
+export async function setCompanyActive(
+  companyId: string,
+  active: boolean,
+): Promise<SetCompanyActiveResult> {
+  const { supabase, isPlatformAdmin } = await requirePlatformAdmin();
+  if (!isPlatformAdmin) {
+    return { ok: false, message: "Only the platform admin can do this." };
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ active })
+    .eq("id", companyId);
+
+  if (error) {
+    return { ok: false, message: "Could not update the company." };
+  }
+
+  revalidatePath("/admin/companies");
+  return { ok: true, message: active ? "Reactivated." : "Suspended." };
+}
+
 export type DeleteCompanyResult = { ok: boolean; message: string };
 
 // Deliberately not a full cascading delete. Every tenant table's
