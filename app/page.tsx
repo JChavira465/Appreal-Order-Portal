@@ -221,6 +221,15 @@ export default async function HomePage() {
               Issues
             </Link>
           )}
+
+          {isPlatformAdmin && (
+            <Link
+              href="/admin/companies"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Companies
+            </Link>
+          )}
         </div>
 
         <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
