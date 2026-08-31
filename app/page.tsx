@@ -42,9 +42,11 @@ export default async function HomePage() {
   const isSuperAdmin = profile?.role === "super_admin";
   const isPlatformAdmin = profile?.platform_admin === true;
   const displayName = profile?.full_name || user.email;
-  const roleLabel = profile?.role
-    ? (ROLE_LABEL[profile.role] ?? profile.role)
-    : "Pending";
+  const roleLabel = isPlatformAdmin
+    ? "Platform Admin"
+    : profile?.role
+      ? (ROLE_LABEL[profile.role] ?? profile.role)
+      : "Pending";
 
   const { data: staff } = isManager
     ? await supabase
