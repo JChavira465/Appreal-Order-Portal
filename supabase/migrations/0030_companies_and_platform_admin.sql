@@ -60,9 +60,19 @@ declare
   default_company_id uuid;
 begin
   if exists (select 1 from profiles where company_id is null and not platform_admin)
-     or exists (select 1 from orders where company_id is null) then
-    insert into companies (name, slug) values ('Default Company', 'default-company')
-    returning id into default_company_id;
+     or exists (select 1 from customers where company_id is null)
+     or exists (select 1 from orders where company_id is null)
+     or exists (select 1 from vendors where company_id is null)
+     or exists (select 1 from price_items where company_id is null)
+     or exists (select 1 from login_events where company_id is null)
+     or exists (select 1 from issue_reports where company_id is null)
+     or exists (select 1 from partner_splits where company_id is null)
+     or exists (select 1 from roster_template_players where company_id is null) then
+    select id into default_company_id from companies where slug = 'default-company';
+    if default_company_id is null then
+      insert into companies (name, slug) values ('Default Company', 'default-company')
+      returning id into default_company_id;
+    end if;
 
     update profiles set company_id = default_company_id
       where company_id is null and not platform_admin;
