@@ -16,11 +16,25 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        await supabase.from("login_events").insert({ profile_id: user.id });
+        const { error: loginEventError } = await supabase
+          .from("login_events")
+          .insert({ profile_id: user.id });
+        // Not fatal to sign-in, but silently swallowing it hid a real
+        // multi-tenant bug: a brand-new signup has no company_id yet, and
+        // login_events.company_id is NOT NULL, so this insert fails for
+        // every first-time magic-link login until a platform admin
+        // assigns a company. Surface it instead of hiding it.
+        if (loginEventError) {
+          console.error("auth/callback: login_events insert failed", loginEventError);
+        }
       }
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error("auth/callback: exchangeCodeForSession failed", error);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`,
+    );
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${origin}/login?error=missing_code`);
 }

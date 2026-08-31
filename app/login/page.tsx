@@ -13,9 +13,9 @@ import { LoginForm } from "./LoginForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ company?: string }>;
+  searchParams: Promise<{ company?: string; error?: string }>;
 }) {
-  const { company: companySlug } = await searchParams;
+  const { company: companySlug, error } = await searchParams;
   const supabase = await createClient();
 
   const { data: staff } = companySlug
@@ -28,6 +28,12 @@ export default async function LoginPage({
         <h1 className="font-script mb-1 text-center text-5xl leading-tight text-black">
           Order Desk
         </h1>
+
+        {error && (
+          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-xs text-red-700">
+            Sign-in failed: {error}
+          </p>
+        )}
 
         {companySlug ? (
           <>
