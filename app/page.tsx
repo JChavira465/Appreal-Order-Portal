@@ -6,6 +6,7 @@ import { PinForm } from "./PinForm";
 import { AddRepForm } from "./AddRepForm";
 import { AddManagerForm } from "./AddManagerForm";
 import { StaffRow } from "./StaffRow";
+import { OrderLinkCard } from "./OrderLinkCard";
 
 const ROLE_LABEL: Record<string, string> = {
   rep: "Rep",
@@ -99,6 +100,17 @@ export default async function HomePage() {
         .eq("role", "rep")
         .order("full_name")
     : { data: null };
+
+  // Their own customer order link, if they've made one already -- RLS
+  // scopes order_links to the caller's own row for a rep.
+  const { data: orderLink } = !isPlatformAdmin
+    ? await supabase
+        .from("order_links")
+        .select("token")
+        .eq("rep_id", user.id)
+        .maybeSingle()
+    : { data: null };
+  const orderLinkToken = orderLink?.token ?? null;
 
   // RLS already scopes this to "my orders" for a rep and "all orders" for
   // a manager, same as the Order Board -- no extra filter needed here.
@@ -267,6 +279,8 @@ export default async function HomePage() {
             </Link>
           )}
         </div>
+
+        {!isPlatformAdmin && <OrderLinkCard initialToken={orderLinkToken} />}
 
         <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
           <PinForm />

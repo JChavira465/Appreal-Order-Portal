@@ -7,7 +7,11 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
 // small-business tracking/invoice links. It reads via the admin client
 // (see app/track/[id]/page.tsx), not the signed-in user's session, so it
 // must stay reachable without a session here.
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/track/"];
+// /order/[token] is the customer-facing intake form a rep sends out --
+// the customer has no account, and the token is what identifies the
+// company/rep, so it has to stay reachable without a session (same trust
+// model as /track/ above).
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/track/", "/order/"];
 
 // Vercel kills a middleware invocation outright at 25s with a raw 504 --
 // no chance to respond gracefully. Supabase's getUser() call occasionally
