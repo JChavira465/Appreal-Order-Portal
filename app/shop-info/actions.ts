@@ -47,7 +47,29 @@ export async function saveShopInfo(
 
   if (error) {
     console.error("saveShopInfo: upsert failed", error);
-    return { ok: false, message: "Could not save. Try again." };
+
+    // "Could not save. Try again." is the wrong answer to every cause
+    // this actually has -- retrying a missing table forever is not a
+    // recovery path. The overwhelmingly common one is 0036 not having
+    // been run yet, which Postgres reports as an undefined table
+    // (42P01) or, through PostgREST's schema cache, PGRST205. Name it,
+    // because the fix is a migration and no amount of retrying is.
+    //
+    // This is a manager-only internal screen, so the raw message is
+    // safe to show here and is the difference between a five-second
+    // diagnosis and a support round-trip -- the exact swallowed-error
+    // trap CLAUDE.md warns about.
+    const missingTable =
+      error.code === "42P01" ||
+      error.code === "PGRST205" ||
+      /company_settings/i.test(error.message);
+
+    return {
+      ok: false,
+      message: missingTable
+        ? "Shop info isn't set up in the database yet — migration 0036 still needs to be run in Supabase."
+        : `Could not save: ${error.message}`,
+    };
   }
 
   revalidatePath(asCompany ? `/shop-info?company=${asCompany}` : "/shop-info");
