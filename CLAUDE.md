@@ -61,7 +61,7 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 0** (guides last regenerated August 30,
+- **Changes since last guide update: 1** (guides last regenerated August 30,
   2026)
 
 ## Things that have bitten us before

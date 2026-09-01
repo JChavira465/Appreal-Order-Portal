@@ -2,6 +2,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
+const ERROR_MESSAGES: Record<string, string> = {
+  link_invalid:
+    "That sign-in link didn't work -- it may have already been used or expired. Request a new one.",
+  missing_code: "That sign-in link was incomplete. Request a new one.",
+  default: "Sign-in failed. Try again, or request a new sign-in link.",
+};
+
 // Which company's staff list this login page shows is resolved from the
 // URL (?company=<slug>), since there's no session yet to derive it from.
 // This is a stopgap, not the final design -- a real per-company login URL
@@ -16,6 +23,12 @@ export default async function LoginPage({
   searchParams: Promise<{ company?: string; error?: string }>;
 }) {
   const { company: companySlug, error } = await searchParams;
+  // Mapped to a fixed set rather than rendered as-is. React escapes the
+  // value so this was never an XSS, but ?error= is attacker-controlled
+  // and anything echoed here reads to the user as if the app said it --
+  // "Sign-in failed: call 555-0100 to restore your account" on the real
+  // sign-in page is a convincing phishing lure for free.
+  const errorMessage = ERROR_MESSAGES[error ?? ""] ?? (error ? ERROR_MESSAGES.default : null);
   const supabase = await createClient();
 
   const { data: staff } = companySlug
@@ -29,9 +42,9 @@ export default async function LoginPage({
           Order Desk
         </h1>
 
-        {error && (
+        {errorMessage && (
           <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-xs text-red-700">
-            Sign-in failed: {error}
+            {errorMessage}
           </p>
         )}
 

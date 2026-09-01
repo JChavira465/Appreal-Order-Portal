@@ -116,6 +116,17 @@ SUPABASE_SERVICE_ROLE_KEY=
 `anon` key) — server-only, never prefixed with `NEXT_PUBLIC_` or
 referenced from a Client Component.
 
+In production also set:
+
+```
+NEXT_PUBLIC_SITE_URL=https://your-final-domain
+```
+
+This is the base URL the emailed magic-link callback points back to. Left
+unset, that URL falls back to the incoming request's `Origin` header,
+which is set by whoever made the request — fine locally, not something to
+trust on a real deployment.
+
 ### 3. Run locally
 
 ```bash
@@ -129,8 +140,8 @@ created above).
 ### 4. Deploy to Vercel
 
 1. Import this repo into Vercel.
-2. Add the same three environment variables in **Project Settings →
-   Environment Variables**.
+2. Add the same environment variables in **Project Settings →
+   Environment Variables** (including `NEXT_PUBLIC_SITE_URL`).
 3. Deploy, then confirm Supabase's Site URL/Redirect URLs match the final
    domain exactly.
 
@@ -234,4 +245,83 @@ supabase/migrations/           see below
                                           is_platform_admin() helpers, scoped list_active_staff()
 0031_multi_tenant_rls.sql     every RLS policy rewritten to enforce the company boundary;
                                  issue_reports restricted to the platform admin only
+0032_company_suspension.sql   current_company_id() returns null while a company is inactive,
+                                 so suspending one row locks out every table at once
+0033_price_items_per_company.sql  price_items keyed on (company_id, name) instead of name
+                                     alone; company_id + composite FKs on price_modifiers,
+                                     order_items and vendor_item_costs
+0034_customer_order_links.sql order_links table + orders.customer_submitted, for the
+                                 customer-facing intake form; set_order_item_price() scoped
+                                 to the order's own company
+0035_security_hardening.sql   price_modifiers RLS scoped to its own company_id (was joining
+                                 price_items on name alone, leaking across companies);
+                                 role changes restricted to a super_admin/platform admin and
+                                 never to your own row
 ```
+
+## Changelog
+
+### September 1, 2026 — Security audit and fixes
+
+A full pass over the multi-tenant conversion: every `createAdminClient`
+(RLS-bypassing) call site, every server action, every RLS policy, and the
+public/unauthenticated surface. Seven issues found and fixed.
+
+Tenant boundary:
+
+- **`price_modifiers` leaked across companies (read and write).** `0031`
+  resolved that table's tenancy by joining `price_items` on `name` alone,
+  which was correct while `price_items.name` was globally unique. `0033`
+  changed the key to `(company_id, name)` and gave `price_modifiers` its
+  own `company_id`, but the policies were never updated — so a manager at
+  one company could read, edit and delete another company's add-on rows
+  for any item name both happened to share ("Jersey", "Hoodie"). `0035`
+  scopes the policies to the row's own `company_id`.
+
+Privilege escalation:
+
+- **A manager could promote themselves to `super_admin`.**
+  `protect_profile_fields` gated role changes behind `is_manager()`, which
+  has always meant "manager *or* super_admin", and `profiles_update` lets
+  a user edit their own row. The app's own UI refuses this, but the anon
+  key is public and PostgREST takes an authenticated `PATCH` directly.
+  Role changes now require a super_admin or the platform admin, and
+  nobody can change their own role.
+
+Unauthenticated surface:
+
+- **Account recovery created accounts.** `signInWithOtp` defaults to
+  `shouldCreateUser: true`, so anyone could type any email into
+  `/login/recovery` and have an auth user provisioned for it — on a
+  platform with no public sign-up — while spending the project's email
+  quota to mail arbitrary addresses. Now `shouldCreateUser: false`, with
+  a deliberately identical response either way so the form can't be used
+  to test whether an address has an account.
+- **The magic-link callback URL came from the request's `Origin`
+  header.** Attacker-controlled input deciding where a sign-in link
+  points, with Supabase's redirect allowlist as the only backstop — and a
+  wildcard entry there (which preview deployments encourage) removes that
+  backstop. Now read from `NEXT_PUBLIC_SITE_URL`, falling back to the
+  request origin only for local development.
+- **Post-auth open redirect in `/auth/callback`.** The `next` query
+  parameter was concatenated onto the site origin unchecked, so
+  `next=//evil.com` sent a *freshly authenticated* user to another origin.
+  Only plain same-site paths are accepted now.
+- **The customer order form could overwrite an existing customer.**
+  `submitCustomerOrder` matched an existing customer with `ilike` on the
+  team name the customer typed, and PostgREST passes `%`/`_` through as
+  SQL wildcards — so a team name of `%` matched the shop's first customer
+  row and overwrote its contact name, phone and shipping address. Added
+  `lib/like.ts` and escaped the wildcards at all three `ilike` call sites.
+- **Unmetered spend on AI concept generation.** `generateAiConcept`
+  called the paid image API before checking the caller could see the
+  order, and its four-per-order cap counts `order_images` rows — which
+  returns 0 for any order id the caller can't read. A random UUID was
+  therefore an unlimited generation budget. The order is now confirmed
+  visible first.
+
+Also tightened: `/login` no longer echoes an arbitrary `?error=` string
+back to the user (React escaped it, so never an XSS, but "Sign-in failed:
+&lt;attacker text&gt;" on a real sign-in page is a free phishing lure), and
+raw Supabase error text is no longer surfaced on the unauthenticated
+recovery and callback paths.

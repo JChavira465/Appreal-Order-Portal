@@ -23,6 +23,21 @@ export async function generateAiConcept(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Not signed in." };
 
+  // Confirm the caller can actually see this order BEFORE spending money
+  // on a generation. RLS already stops the image from being saved to an
+  // order that isn't theirs, but that check happens after the paid API
+  // call -- and the per-order cap below is counted from order_images,
+  // which returns 0 for any order id the caller can't read. Together
+  // that made an unrecognized order id an unlimited generation budget:
+  // post a random UUID, the cap reads 0, the image gets generated and
+  // billed, and only the final insert fails.
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { ok: false, message: "Order not found." };
+
   const { count } = await supabase
     .from("order_images")
     .select("id", { count: "exact", head: true })

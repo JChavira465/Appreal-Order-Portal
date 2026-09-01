@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { uploadOrderImage } from "@/lib/order-images";
+import { escapeLike } from "@/lib/like";
 
 export type CreateOrderResult = { ok: boolean; message: string } | null;
 
@@ -72,7 +73,7 @@ export async function createOrder(
   const { data: existingCustomer } = await supabase
     .from("customers")
     .select("id")
-    .ilike("team_name", teamName)
+    .ilike("team_name", escapeLike(teamName))
     .limit(1)
     .maybeSingle();
 

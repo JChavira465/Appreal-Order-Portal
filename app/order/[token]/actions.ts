@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { escapeLike } from "@/lib/like";
 
 export type CustomerOrderResult = { ok: boolean; message: string } | null;
 
@@ -90,7 +91,7 @@ export async function submitCustomerOrder(
     .from("customers")
     .select("id")
     .eq("company_id", link.company_id)
-    .ilike("team_name", teamName)
+    .ilike("team_name", escapeLike(teamName))
     .limit(1)
     .maybeSingle();
 

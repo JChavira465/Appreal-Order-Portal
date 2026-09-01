@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { escapeLike } from "@/lib/like";
 
 export type RecentDuplicate = { orderNumber: number; createdAt: string } | null;
 
@@ -20,7 +21,7 @@ export async function checkRecentDuplicate(teamName: string): Promise<RecentDupl
   const { data, error } = await supabase
     .from("orders")
     .select("order_number, created_at")
-    .ilike("team_name", trimmed)
+    .ilike("team_name", escapeLike(trimmed))
     .neq("status", "draft")
     .neq("status", "cancelled")
     .gte("created_at", since)
