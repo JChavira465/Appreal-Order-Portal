@@ -18,7 +18,56 @@
 -- order_items and vendor_item_costs, auto-stamped by trigger from their
 -- parent order/vendor -- no app code needs to change to supply it) and a
 -- composite foreign key against (company_id, name) instead of name alone.
+--
+-- Order matters here: price_items_pkey can't be dropped while the three
+-- FKs below still depend on it, so those come first.
 
+do $$
+declare
+  fk_name text;
+begin
+  select con.conname into fk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  where rel.relname = 'price_modifiers'
+    and con.contype = 'f'
+    and pg_get_constraintdef(con.oid) ilike '%price_items%';
+  if fk_name is not null then
+    execute format('alter table price_modifiers drop constraint %I', fk_name);
+  end if;
+end $$;
+
+do $$
+declare
+  fk_name text;
+begin
+  select con.conname into fk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  where rel.relname = 'order_items'
+    and con.contype = 'f'
+    and pg_get_constraintdef(con.oid) ilike '%price_items%';
+  if fk_name is not null then
+    execute format('alter table order_items drop constraint %I', fk_name);
+  end if;
+end $$;
+
+do $$
+declare
+  fk_name text;
+begin
+  select con.conname into fk_name
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  where rel.relname = 'vendor_item_costs'
+    and con.contype = 'f'
+    and pg_get_constraintdef(con.oid) ilike '%price_items%';
+  if fk_name is not null then
+    execute format('alter table vendor_item_costs drop constraint %I', fk_name);
+  end if;
+end $$;
+
+-- Now safe to restructure price_items' key.
 alter table price_items drop constraint if exists price_items_pkey;
 alter table price_items add constraint price_items_pkey primary key (company_id, name);
 
@@ -35,22 +84,6 @@ where pi.name = pm.item_name and pm.company_id is null;
 
 alter table price_modifiers alter column company_id set not null;
 alter table price_modifiers alter column company_id set default current_company_id();
-
-do $$
-declare
-  fk_name text;
-begin
-  select con.conname into fk_name
-  from pg_constraint con
-  join pg_class rel on rel.oid = con.conrelid
-  where rel.relname = 'price_modifiers'
-    and con.contype = 'f'
-    and pg_get_constraintdef(con.oid) ilike '%price_items%';
-
-  if fk_name is not null then
-    execute format('alter table price_modifiers drop constraint %I', fk_name);
-  end if;
-end $$;
 
 alter table price_modifiers
   add constraint price_modifiers_item_fkey
@@ -91,22 +124,6 @@ create trigger order_items_set_company_id
   before insert on order_items
   for each row execute function set_order_item_company_id();
 
-do $$
-declare
-  fk_name text;
-begin
-  select con.conname into fk_name
-  from pg_constraint con
-  join pg_class rel on rel.oid = con.conrelid
-  where rel.relname = 'order_items'
-    and con.contype = 'f'
-    and pg_get_constraintdef(con.oid) ilike '%price_items%';
-
-  if fk_name is not null then
-    execute format('alter table order_items drop constraint %I', fk_name);
-  end if;
-end $$;
-
 alter table order_items
   add constraint order_items_item_fkey
   foreign key (company_id, item) references price_items (company_id, name);
@@ -141,22 +158,6 @@ drop trigger if exists vendor_item_costs_set_company_id on vendor_item_costs;
 create trigger vendor_item_costs_set_company_id
   before insert on vendor_item_costs
   for each row execute function set_vendor_item_cost_company_id();
-
-do $$
-declare
-  fk_name text;
-begin
-  select con.conname into fk_name
-  from pg_constraint con
-  join pg_class rel on rel.oid = con.conrelid
-  where rel.relname = 'vendor_item_costs'
-    and con.contype = 'f'
-    and pg_get_constraintdef(con.oid) ilike '%price_items%';
-
-  if fk_name is not null then
-    execute format('alter table vendor_item_costs drop constraint %I', fk_name);
-  end if;
-end $$;
 
 alter table vendor_item_costs
   add constraint vendor_item_costs_item_fkey
