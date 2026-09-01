@@ -40,13 +40,39 @@ export async function addPriceItem(
     return { ok: false, message: "Enter a valid base price." };
   }
 
+  // "Remove" is a soft delete (active = false) so past orders that
+  // reference the item still price and display correctly. That means a
+  // removed item still occupies its name -- re-adding it should bring it
+  // back with whatever was just typed, not refuse because a row nobody
+  // can see is technically still there.
   const { data: existing } = await supabase
     .from("price_items")
-    .select("name")
+    .select("name, active")
     .eq("name", name)
     .eq("company_id", companyId)
     .maybeSingle();
-  if (existing) return { ok: false, message: "That item already exists." };
+
+  if (existing?.active) {
+    return { ok: false, message: "That item already exists." };
+  }
+
+  if (existing) {
+    const { error: restoreError } = await supabase
+      .from("price_items")
+      .update({
+        base_price: basePrice,
+        is_headwear: isHeadwear,
+        size_group: sizeGroup,
+        category: category || null,
+        active: true,
+      })
+      .eq("name", name)
+      .eq("company_id", companyId);
+    if (restoreError) return { ok: false, message: "Could not add item." };
+
+    revalidatePath(pricingPath(asCompany));
+    return { ok: true, message: `${name} added back.` };
+  }
 
   const { data: maxRow } = await supabase
     .from("price_items")
