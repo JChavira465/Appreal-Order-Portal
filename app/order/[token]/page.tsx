@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SIZES_BY_GROUP, isSizeGroup } from "@/lib/sizes";
+import { loadShopInfo } from "@/lib/shopInfo";
+import { ShopInfoBlock } from "@/app/ShopInfoBlock";
 import { CustomerOrderForm, type CustomerCatalogItem } from "./CustomerOrderForm";
 
 export default async function CustomerOrderPage({
@@ -40,6 +42,11 @@ export default async function CustomerOrderPage({
     );
   }
 
+  // Shown above the form, not below it: payment terms and turnaround are
+  // what a customer wants to know BEFORE filling anything out, and this
+  // shop's own price sheet leads with them.
+  const shopInfo = await loadShopInfo(admin, link.company_id);
+
   const [{ data: items }, { data: mods }] = await Promise.all([
     admin
       .from("price_items")
@@ -74,6 +81,8 @@ export default async function CustomerOrderPage({
         </h1>
         <p className="mt-1 text-sm text-neutral-500">Start your team order</p>
       </div>
+
+      <ShopInfoBlock info={shopInfo} className="mb-6" />
 
       {catalog.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">

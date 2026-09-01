@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { money } from "@/lib/catalog";
+import { loadShopInfo } from "@/lib/shopInfo";
+import { ShopInfoBlock } from "@/app/ShopInfoBlock";
 import { PrintButton } from "../PrintButton";
 
 type OrderItem = {
@@ -71,7 +73,7 @@ export default async function OrderReceiptPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      `id, order_number, team_name, contact_name, contact_phone, sport,
+      `id, order_number, company_id, team_name, contact_name, contact_phone, sport,
        deadline, shipping_address, notes, shipping_fee, discount, created_at,
        order_items(item, mods, qty, unit_price, line_total,
          order_item_sizes(size_label, qty)),
@@ -92,6 +94,11 @@ export default async function OrderReceiptPage({
       </main>
     );
   }
+
+  // The shop's standing terms, printed alongside the balance due -- the
+  // two questions a customer reads a receipt to answer are "what do I
+  // owe" and "when do I get it", and the second one lived nowhere.
+  const shopInfo = await loadShopInfo(supabase, order.company_id as string);
 
   const items = (order.order_items ?? []) as OrderItem[];
   const payments = (order.payments ?? []) as Payment[];
@@ -231,6 +238,8 @@ export default async function OrderReceiptPage({
           </div>
         </div>
       )}
+
+      <ShopInfoBlock info={shopInfo} className="mt-6" />
 
       <p className="mt-8 text-center text-xs text-neutral-400">
         Thanks for your order — questions? Reach out to whoever you&apos;ve

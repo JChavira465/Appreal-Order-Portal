@@ -204,6 +204,8 @@ lib/
   exportOrders.ts              Excel/TSV export (dynamically imported)
   tracking.ts                  carrier list for shipment tracking numbers
   ai-mockup.ts                 calls OpenAI's gpt-image-2 for the AI concept feature
+  shopInfo.ts                  loads a company's standing terms (payment/turnaround/tax)
+  like.ts                      escapes SQL LIKE wildcards before an ilike match
 supabase/migrations/           see below
 ```
 
@@ -257,9 +259,40 @@ supabase/migrations/           see below
                                  price_items on name alone, leaking across companies);
                                  role changes restricted to a super_admin/platform admin and
                                  never to your own row
+0036_shop_info.sql            company_settings table (payment terms, turnaround, tax/shipping
+                                 note), kept separate from `companies` so an owner editing
+                                 their own terms can't reach `active` or `slug`
 ```
 
 ## Changelog
+
+### September 1, 2026 — Shop info
+
+Every shop has standing terms — when they need to be paid, how long
+production takes, how tax and shipping are handled — and they lived
+nowhere in the app. A customer reading a receipt or a tracking page had
+no way to answer "when do I get this?", and a rep sending an order link
+had to paste the terms into a text message by hand every time.
+
+**Managers now set three fields once, under Shop Info**, and they appear
+on all three customer-facing surfaces automatically:
+
+- the printed receipt, next to the balance due;
+- the public tracking page;
+- the customer-facing order form, above the items — payment terms and
+  turnaround are what someone wants to know *before* filling out an
+  order, not after.
+
+Any field left empty is hidden, and a shop that sets none of the three
+shows no terms section at all. The platform admin can edit a company's
+shop info the same way as pricing, via `?company=<slug>`.
+
+`company_settings` is a separate table rather than columns on
+`companies`, and that is load-bearing rather than tidiness:
+`companies_update` is platform-admin-only because `active` is the
+suspension lever and `slug` is what every sign-in URL resolves through.
+Opening that row up so an owner could edit their own turnaround time
+would also hand them their own un-suspend button.
 
 ### September 1, 2026 — Security audit and fixes
 

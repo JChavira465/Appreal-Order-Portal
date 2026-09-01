@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signedUrlsFor } from "@/lib/order-images";
+import { loadShopInfo } from "@/lib/shopInfo";
+import { ShopInfoBlock } from "@/app/ShopInfoBlock";
 import { CARRIER_LABELS, isCarrier, trackingUrl, type Carrier } from "@/lib/tracking";
 import { MockupActions } from "./MockupActions";
 
@@ -48,7 +50,7 @@ export default async function TrackPage({
   const { data: order } = await admin
     .from("orders")
     .select(
-      `team_name, status, revision_requested, deadline, mockup_notes,
+      `company_id, team_name, status, revision_requested, deadline, mockup_notes,
        order_tracking_numbers(id, carrier, tracking_number),
        order_images(id, storage_path, kind)`,
     )
@@ -65,6 +67,11 @@ export default async function TrackPage({
       </main>
     );
   }
+
+  // Read with the admin client like everything else on this page -- the
+  // visitor has no session. Safe to expose: these are the same terms the
+  // shop prints on its own price sheet, written to be read by customers.
+  const shopInfo = await loadShopInfo(admin, order.company_id as string);
 
   const trackingEntries = (order.order_tracking_numbers ?? []) as TrackingRow[];
   const mockupImages = ((order.order_images ?? []) as ImageRow[]).filter(
@@ -187,6 +194,8 @@ export default async function TrackPage({
           </div>
         </div>
       )}
+
+      <ShopInfoBlock info={shopInfo} className="mt-6" />
 
       <p className="mt-8 text-center text-xs text-neutral-400">
         Questions? Reach out to whoever you&apos;ve been working with on

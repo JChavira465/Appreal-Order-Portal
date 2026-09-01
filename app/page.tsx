@@ -252,6 +252,15 @@ export default async function HomePage() {
             </Link>
           )}
 
+          {isManager && (
+            <Link
+              href="/shop-info"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Shop Info
+            </Link>
+          )}
+
           {isSuperAdmin && (
             <Link
               href="/company"
