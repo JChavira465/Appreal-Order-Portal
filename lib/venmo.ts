@@ -16,11 +16,16 @@ export type VenmoCollector = { name: string; username: string };
 
 export async function loadVenmoCollectors(
   supabase: SupabaseClient,
+  companyId: string,
 ): Promise<VenmoCollector[]> {
+  // is_platform_admin() bypasses RLS entirely, so an unfiltered query
+  // here would return every company's collectors mixed together for
+  // that account -- same reasoning as loadCatalog's company_id filter.
   const { data } = await supabase
     .from("venmo_collectors")
     .select("name, username")
     .eq("active", true)
+    .eq("company_id", companyId)
     .order("sort_order");
   return data ?? [];
 }

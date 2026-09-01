@@ -84,6 +84,14 @@ export default async function AdminCompaniesPage() {
               <div className="mt-1 text-xs text-neutral-500">
                 /login?company={c.slug}
               </div>
+              <div className="mt-2 flex gap-3 text-xs">
+                <Link href={`/pricing?company=${c.slug}`} className="text-black underline">
+                  Pricing
+                </Link>
+                <Link href={`/orders?company=${c.slug}`} className="text-black underline">
+                  Orders
+                </Link>
+              </div>
               <SuspendCompanyButton
                 companyId={c.id}
                 companyName={c.name}

@@ -52,7 +52,7 @@ export default async function ReportsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", user.id)
     .single();
   const isManager =
@@ -78,7 +78,7 @@ export default async function ReportsPage() {
         `team_name, status, shipping_fee, discount, created_at,
          order_items(item, qty, line_total)`,
       ),
-    loadCatalog(supabase),
+    loadCatalog(supabase, profile?.company_id ?? ""),
   ]);
 
   const active = ((orders ?? []) as ReportOrderRow[]).filter(

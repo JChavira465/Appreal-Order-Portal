@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { requireViewerContext } from "@/lib/adminAssist";
 import { money, loadCatalog } from "@/lib/catalog";
 import { signedUrlsFor } from "@/lib/order-images";
 import {
@@ -295,33 +295,38 @@ type TrackingRow = {
 
 export default async function OrderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ company?: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const { company: asCompany } = await searchParams;
+  const ctx = await requireViewerContext(asCompany ?? null);
+
+  if (!ctx) {
+    return (
+      <main className="mx-auto max-w-lg px-5 py-6">
+        <div className="rounded-xl border-2 border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
+          Not signed in, or no company to show this order for.
+        </div>
+      </main>
+    );
+  }
+  const { supabase, companyId, isAssisting } = ctx;
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return (
-      <main className="mx-auto max-w-lg px-5 py-6">
-        <div className="rounded-xl border-2 border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
-          Not signed in.
-        </div>
-      </main>
-    );
-  }
+  const { data: profile } = !isAssisting
+    ? await supabase.from("profiles").select("role").eq("id", user!.id).single()
+    : { data: null };
+  const isManager = isAssisting || profile?.role === "manager" || profile?.role === "super_admin";
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  const isManager =
-    profile?.role === "manager" || profile?.role === "super_admin";
+  const { data: assistingCompany } = isAssisting
+    ? await supabase.from("companies").select("name").eq("id", companyId).single()
+    : { data: null };
 
   const [{ data: order }, catalog, venmoCollectors] = await Promise.all([
     supabase
@@ -340,9 +345,10 @@ export default async function OrderDetailPage({
          order_tracking_numbers(id, carrier, tracking_number)`,
       )
       .eq("id", id)
+      .eq("company_id", companyId)
       .maybeSingle(),
-    loadCatalog(supabase),
-    loadVenmoCollectors(supabase),
+    loadCatalog(supabase, companyId),
+    loadVenmoCollectors(supabase, companyId),
   ]);
 
   if (!order) {
@@ -493,7 +499,7 @@ export default async function OrderDetailPage({
 
   const cancelled = order.status === "cancelled";
   const isDraft = order.status === "draft";
-  const isOwnRep = order.rep_id === user.id;
+  const isOwnRep = order.rep_id === user!.id;
   const repCanEdit =
     !isManager && isOwnRep && (order.status === "submitted" || isDraft);
   const canEdit = isManager ? !cancelled : repCanEdit;
@@ -512,6 +518,15 @@ export default async function OrderDetailPage({
       <Link href="/orders" className="text-sm text-neutral-500">
         ← Back
       </Link>
+
+      {isAssisting && (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>Assisting: {assistingCompany?.name ?? asCompany}</span>
+          <Link href="/admin/companies" className="underline">
+            Exit
+          </Link>
+        </div>
+      )}
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">

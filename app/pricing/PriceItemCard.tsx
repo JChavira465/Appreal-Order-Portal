@@ -25,6 +25,7 @@ export function PriceItemCard({
   active,
   sizeGroup,
   modifiers,
+  asCompany,
 }: {
   name: string;
   basePrice: number;
@@ -33,6 +34,7 @@ export function PriceItemCard({
   active: boolean;
   sizeGroup: SizeGroup;
   modifiers: Modifier[];
+  asCompany: string | null;
 }) {
   const [baseState, baseAction, basePending] = useActionState(
     updatePriceItemBase,
@@ -77,6 +79,7 @@ export function PriceItemCard({
         </div>
         <form action={baseAction} className="w-24 shrink-0">
           <input type="hidden" name="name" value={name} />
+          {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
             Base $
           </label>
@@ -106,6 +109,7 @@ export function PriceItemCard({
 
       <form action={sizeGroupAction} className="mt-3 border-t border-neutral-100 pt-3">
         <input type="hidden" name="name" value={name} />
+        {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
         <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
           Size group
         </label>
@@ -137,6 +141,7 @@ export function PriceItemCard({
 
       <form action={categoryAction} className="mt-3 border-t border-neutral-100 pt-3">
         <input type="hidden" name="name" value={name} />
+        {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
         <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-neutral-400">
           Category
         </label>
@@ -168,7 +173,13 @@ export function PriceItemCard({
             Add-ons
           </div>
           {modifiers.map((m) => (
-            <ModifierRow key={m.key} itemName={name} modifier={m} disabled={!active} />
+            <ModifierRow
+              key={m.key}
+              itemName={name}
+              modifier={m}
+              disabled={!active}
+              asCompany={asCompany}
+            />
           ))}
         </div>
       )}
@@ -186,6 +197,7 @@ export function PriceItemCard({
         <form action={activeAction}>
           <input type="hidden" name="name" value={name} />
           <input type="hidden" name="active" value={(!active).toString()} />
+          {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
           <button
             type="submit"
             disabled={activePending}
@@ -202,6 +214,7 @@ export function PriceItemCard({
       {showAddMod && (
         <form action={addModAction} className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
           <input type="hidden" name="itemName" value={name} />
+          {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
           <div className="grid grid-cols-2 gap-2">
             <input
               name="label"
@@ -237,10 +250,12 @@ function ModifierRow({
   itemName,
   modifier,
   disabled,
+  asCompany,
 }: {
   itemName: string;
   modifier: Modifier;
   disabled: boolean;
+  asCompany: string | null;
 }) {
   const [priceState, priceAction, pricePending] = useActionState(
     updateModifierPrice,
@@ -259,6 +274,7 @@ function ModifierRow({
       <form action={priceAction} className="flex items-center gap-1">
         <input type="hidden" name="itemName" value={itemName} />
         <input type="hidden" name="key" value={modifier.key} />
+        {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
         <span className="text-sm text-neutral-400">+$</span>
         <input
           name="price"
@@ -280,6 +296,7 @@ function ModifierRow({
       <form action={removeAction}>
         <input type="hidden" name="itemName" value={itemName} />
         <input type="hidden" name="key" value={modifier.key} />
+        {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
         <button
           type="submit"
           disabled={removePending || disabled}

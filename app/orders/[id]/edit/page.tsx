@@ -27,7 +27,7 @@ export default async function EditOrderPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", user.id)
     .single();
   const isManager =
@@ -45,7 +45,7 @@ export default async function EditOrderPage({
       )
       .eq("id", id)
       .maybeSingle(),
-    loadCatalog(supabase),
+    loadCatalog(supabase, profile?.company_id ?? ""),
     supabase
       .from("customers")
       .select("id, team_name, contact_name, contact_phone, sport, shipping_address")

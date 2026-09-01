@@ -49,7 +49,7 @@ export default async function HatsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id")
     .eq("id", user.id)
     .single();
   const isManager =
@@ -73,7 +73,7 @@ export default async function HatsPage() {
       `id, order_number, team_name, status,
        order_items(item, qty, order_item_costs(vendor_id, vendors(name)))`,
     ),
-    loadCatalog(supabase),
+    loadCatalog(supabase, profile?.company_id ?? ""),
   ]);
 
   const pending = ((orders ?? []) as PendingOrderRow[]).filter((o) =>

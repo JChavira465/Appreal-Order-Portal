@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { requireViewerContext } from "@/lib/adminAssist";
 import { loadCatalog } from "@/lib/catalog";
 import { OrderBoard, type OrderRow } from "./OrderBoard";
 
@@ -50,26 +50,45 @@ function repName(profiles: ProfileRef): string {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string; draft?: string; q?: string }>;
+  searchParams: Promise<{ created?: string; draft?: string; q?: string; company?: string }>;
 }) {
-  const { created, draft, q } = await searchParams;
-  const supabase = await createClient();
+  const { created, draft, q, company: asCompany } = await searchParams;
+  const ctx = await requireViewerContext(asCompany ?? null);
+
+  if (!ctx) {
+    return (
+      <main className="mx-auto max-w-lg px-5 py-6">
+        <Link href="/" className="text-xs text-neutral-400 underline">
+          ← Home
+        </Link>
+        <div className="mt-6 rounded-xl border-2 border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
+          Not signed in, or no company to show orders for.
+        </div>
+      </main>
+    );
+  }
+  const { supabase, companyId, isAssisting } = ctx;
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = user
-    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const { data: profile } = !isAssisting
+    ? await supabase.from("profiles").select("role").eq("id", user!.id).single()
     : { data: null };
-  const isManager =
-    profile?.role === "manager" || profile?.role === "super_admin";
+  const isManager = isAssisting || profile?.role === "manager" || profile?.role === "super_admin";
+
+  const { data: assistingCompany } = isAssisting
+    ? await supabase.from("companies").select("name").eq("id", companyId).single()
+    : { data: null };
 
   // Visiting the board is "I've seen what's here" -- bumps orders_viewed_at
   // so the home page's "N new orders" banner clears. Serverless functions
   // can get torn down right after the response ships, so this is awaited
   // (alongside the orders query, not blocking on it) rather than fired and
-  // forgotten.
+  // forgotten. Skipped while assisting -- that field belongs to the
+  // platform admin's own profile, which has no company of its own to have
+  // "viewed" anything for.
   const [{ data: orders }, catalog] = await Promise.all([
     supabase
       .from("orders")
@@ -85,9 +104,10 @@ export default async function OrdersPage({
          order_costs(shipping_cost, supplies_cost, vendors(name)),
          payments(amount)`,
       )
+      .eq("company_id", companyId)
       .order("created_at", { ascending: false }),
-    loadCatalog(supabase),
-    isManager && user
+    loadCatalog(supabase, companyId),
+    isManager && user && !isAssisting
       ? supabase
           .from("profiles")
           .update({ orders_viewed_at: new Date().toISOString() })
@@ -193,6 +213,14 @@ export default async function OrdersPage({
       <Link href="/" className="text-xs text-neutral-400 underline">
         ← Home
       </Link>
+      {isAssisting && (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>Assisting: {assistingCompany?.name ?? asCompany}</span>
+          <Link href="/admin/companies" className="underline">
+            Exit
+          </Link>
+        </div>
+      )}
       {created && (
         <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
           Order #{created} submitted.
@@ -203,7 +231,12 @@ export default async function OrdersPage({
           Order #{draft} saved as a draft — only you can see it until you submit it.
         </div>
       )}
-      <OrderBoard orders={rows} isManager={isManager} initialQuery={q ?? ""} />
+      <OrderBoard
+        orders={rows}
+        isManager={isManager}
+        initialQuery={q ?? ""}
+        asCompany={asCompany ?? null}
+      />
     </main>
   );
 }

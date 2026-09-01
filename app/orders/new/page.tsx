@@ -11,8 +11,15 @@ export default async function NewOrderPage({
   const { reorder } = await searchParams;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("company_id").eq("id", user.id).single()
+    : { data: null };
+
   const [catalog, { data: customers }, { data: sourceOrder }] = await Promise.all([
-    loadCatalog(supabase),
+    loadCatalog(supabase, profile?.company_id ?? ""),
     supabase
       .from("customers")
       .select("id, team_name, contact_name, contact_phone, sport, shipping_address")

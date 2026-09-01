@@ -1,29 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireManagerContext } from "@/lib/adminAssist";
 import { isSizeGroup } from "@/lib/sizes";
 
 export type ActionResult = { ok: boolean; message: string } | null;
-
-async function requireManager() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "manager" && profile?.role !== "super_admin") {
-    return null;
-  }
-  return supabase;
-}
 
 function slugify(label: string): string {
   return label
@@ -34,12 +15,18 @@ function slugify(label: string): string {
     .slice(0, 30);
 }
 
+function pricingPath(asCompany: string | null): string {
+  return asCompany ? `/pricing?company=${asCompany}` : "/pricing";
+}
+
 export async function addPriceItem(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const name = String(formData.get("name") ?? "").trim();
   const basePrice = Number(formData.get("basePrice"));
@@ -57,12 +44,14 @@ export async function addPriceItem(
     .from("price_items")
     .select("name")
     .eq("name", name)
+    .eq("company_id", companyId)
     .maybeSingle();
   if (existing) return { ok: false, message: "That item already exists." };
 
   const { data: maxRow } = await supabase
     .from("price_items")
     .select("sort_order")
+    .eq("company_id", companyId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -75,10 +64,11 @@ export async function addPriceItem(
     size_group: sizeGroup,
     category: category || null,
     sort_order: sortOrder,
+    company_id: companyId,
   });
   if (error) return { ok: false, message: "Could not add item." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: `${name} added.` };
 }
 
@@ -86,8 +76,10 @@ export async function updatePriceItemBase(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const name = String(formData.get("name") ?? "");
   const basePrice = Number(formData.get("basePrice"));
@@ -98,10 +90,11 @@ export async function updatePriceItemBase(
   const { error } = await supabase
     .from("price_items")
     .update({ base_price: basePrice })
-    .eq("name", name);
+    .eq("name", name)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not update price." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Price updated." };
 }
 
@@ -109,8 +102,10 @@ export async function setPriceItemActive(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const name = String(formData.get("name") ?? "");
   const active = formData.get("active") === "true";
@@ -118,10 +113,11 @@ export async function setPriceItemActive(
   const { error } = await supabase
     .from("price_items")
     .update({ active })
-    .eq("name", name);
+    .eq("name", name)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not update item." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: active ? "Item reactivated." : "Item removed." };
 }
 
@@ -129,8 +125,10 @@ export async function updatePriceItemCategory(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const name = String(formData.get("name") ?? "");
   const category = String(formData.get("category") ?? "").trim().toUpperCase();
@@ -138,10 +136,11 @@ export async function updatePriceItemCategory(
   const { error } = await supabase
     .from("price_items")
     .update({ category: category || null })
-    .eq("name", name);
+    .eq("name", name)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not update category." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Category updated." };
 }
 
@@ -149,8 +148,10 @@ export async function updatePriceItemSizeGroup(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const name = String(formData.get("name") ?? "");
   const sizeGroupRaw = String(formData.get("sizeGroup") ?? "");
@@ -161,10 +162,11 @@ export async function updatePriceItemSizeGroup(
   const { error } = await supabase
     .from("price_items")
     .update({ size_group: sizeGroupRaw })
-    .eq("name", name);
+    .eq("name", name)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not update size group." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Size group updated." };
 }
 
@@ -172,8 +174,10 @@ export async function addModifier(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const itemName = String(formData.get("itemName") ?? "");
   const label = String(formData.get("label") ?? "").trim();
@@ -186,10 +190,10 @@ export async function addModifier(
 
   const { error } = await supabase
     .from("price_modifiers")
-    .insert({ item_name: itemName, key, label, price });
+    .insert({ item_name: itemName, key, label, price, company_id: companyId });
   if (error) return { ok: false, message: "Could not add add-on (maybe it already exists)." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Add-on added." };
 }
 
@@ -197,8 +201,10 @@ export async function updateModifierPrice(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const itemName = String(formData.get("itemName") ?? "");
   const key = String(formData.get("key") ?? "");
@@ -209,10 +215,11 @@ export async function updateModifierPrice(
     .from("price_modifiers")
     .update({ price })
     .eq("item_name", itemName)
-    .eq("key", key);
+    .eq("key", key)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not update add-on." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Add-on updated." };
 }
 
@@ -220,8 +227,10 @@ export async function removeModifier(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can edit pricing." };
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can edit pricing." };
+  const { supabase, companyId } = ctx;
 
   const itemName = String(formData.get("itemName") ?? "");
   const key = String(formData.get("key") ?? "");
@@ -230,9 +239,10 @@ export async function removeModifier(
     .from("price_modifiers")
     .delete()
     .eq("item_name", itemName)
-    .eq("key", key);
+    .eq("key", key)
+    .eq("company_id", companyId);
   if (error) return { ok: false, message: "Could not remove add-on." };
 
-  revalidatePath("/pricing");
+  revalidatePath(pricingPath(asCompany));
   return { ok: true, message: "Add-on removed." };
 }

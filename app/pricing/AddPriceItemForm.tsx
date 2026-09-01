@@ -6,11 +6,12 @@ import { SIZE_GROUPS, SIZE_GROUP_LABELS } from "@/lib/sizes";
 
 const initialState: ActionResult = null;
 
-export function AddPriceItemForm() {
+export function AddPriceItemForm({ asCompany }: { asCompany: string | null }) {
   const [state, formAction, pending] = useActionState(addPriceItem, initialState);
 
   return (
     <form action={formAction} className="rounded-xl border border-neutral-200 p-4">
+      {asCompany && <input type="hidden" name="asCompany" value={asCompany} />}
       <p className="mb-3 text-sm font-medium text-black">Add a new item</p>
       <div className="grid grid-cols-2 gap-3">
         <input

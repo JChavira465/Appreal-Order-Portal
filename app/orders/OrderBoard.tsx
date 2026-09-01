@@ -173,10 +173,12 @@ export function OrderBoard({
   orders,
   isManager,
   initialQuery,
+  asCompany,
 }: {
   orders: OrderRow[];
   isManager: boolean;
   initialQuery?: string;
+  asCompany?: string | null;
 }) {
   const [q, setQ] = useState(initialQuery ?? "");
   const [sort, setSort] = useState<"deadline" | "newest" | "total">(
@@ -452,7 +454,7 @@ export function OrderBoard({
           {list.map((o) => (
             <Link
               key={o.id}
-              href={`/orders/${o.id}`}
+              href={asCompany ? `/orders/${o.id}?company=${asCompany}` : `/orders/${o.id}`}
               className="block rounded-xl border border-neutral-200 p-4"
               style={{ opacity: o.status === "cancelled" ? 0.55 : 1 }}
             >

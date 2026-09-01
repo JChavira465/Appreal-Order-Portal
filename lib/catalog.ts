@@ -22,7 +22,14 @@ export type Catalog = Record<string, PriceItem>;
 
 export const HAT_MIN = 10;
 
-export async function loadCatalog(supabase: SupabaseClient): Promise<Catalog> {
+export async function loadCatalog(
+  supabase: SupabaseClient,
+  companyId: string,
+): Promise<Catalog> {
+  // is_platform_admin() bypasses RLS entirely, so a query with no explicit
+  // company filter would return every company's catalog mixed together
+  // for that account -- the .eq() below is load-bearing for that case,
+  // not just a redundant belt-and-suspenders on top of RLS.
   const [
     { data: items, error: itemsError },
     { data: mods, error: modsError },
@@ -31,10 +38,12 @@ export async function loadCatalog(supabase: SupabaseClient): Promise<Catalog> {
       .from("price_items")
       .select("name, base_price, is_headwear, category, size_group, sort_order")
       .eq("active", true)
+      .eq("company_id", companyId)
       .order("sort_order"),
     supabase
       .from("price_modifiers")
-      .select("item_name, key, label, price, group_key, is_default"),
+      .select("item_name, key, label, price, group_key, is_default")
+      .eq("company_id", companyId),
   ]);
 
   // A silently-empty catalog looks like "no items exist" everywhere it's
