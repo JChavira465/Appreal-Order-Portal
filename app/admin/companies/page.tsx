@@ -61,9 +61,16 @@ export default async function AdminCompaniesPage() {
         <CreateCompanyForm />
       </div>
 
-      <h2 className="mb-2 mt-8 text-sm font-bold text-black">
-        Existing companies
-      </h2>
+      <div className="mt-8 flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-bold text-black">Existing companies</h2>
+        <a href="/admin/backup" className="text-xs text-black underline">
+          Back up everything
+        </a>
+      </div>
+      <p className="mb-2 mt-1 text-xs text-neutral-500">
+        Exports rows only — not sign-in accounts or uploaded images. Keep
+        Supabase&apos;s own project backups on for real recovery.
+      </p>
       {companies && companies.length > 0 ? (
         <div className="space-y-2">
           {companies.map((c) => (
@@ -91,6 +98,9 @@ export default async function AdminCompaniesPage() {
                 <Link href={`/orders?company=${c.slug}`} className="text-black underline">
                   Orders
                 </Link>
+                <a href={`/admin/backup?company=${c.slug}`} className="text-black underline">
+                  Backup
+                </a>
               </div>
               <SuspendCompanyButton
                 companyId={c.id}
