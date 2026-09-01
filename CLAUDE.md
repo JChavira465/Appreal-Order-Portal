@@ -64,6 +64,33 @@ pushed; reset to 0 immediately after regenerating both guides:
 - **Changes since last guide update: 2** (guides last regenerated August 30,
   2026)
 
+## Before running any check the user asks for
+
+**Standing instruction from the user:** when they ask for a check, an
+audit, a review, or "does this work" — the FIRST thing to do is confirm
+every migration written so far has actually been run against their
+Supabase project. Do not audit or diagnose anything until that's
+established.
+
+List `supabase/migrations/`, name the ones from recent work by number,
+and ask which have been run — or have them run the verification query
+below and paste the result. An unrun migration is the single most common
+cause of "everything is broken" in this app, and it looks identical to a
+real bug from the outside (missing column, empty result, silent
+permission failure). Diagnosing on top of a stale schema wastes their
+time and produces wrong answers.
+
+```sql
+-- What the schema actually has right now
+select
+  to_regclass('public.order_links')       is not null as has_0034,
+  exists (select 1 from pg_policies
+           where tablename = 'price_modifiers'
+             and policyname = 'price_modifiers_select'
+             and qual like '%company_id = current_company_id()%') as has_0035,
+  to_regclass('public.company_settings')  is not null as has_0036;
+```
+
 ## Things that have bitten us before
 
 - Vercel Edge Middleware has a hard 25s execution limit that can't be
