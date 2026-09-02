@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireFeature } from "@/lib/companyPlan";
 
 export type OrderLinkResult = { ok: boolean; message: string; token?: string };
 
@@ -24,6 +25,13 @@ export async function ensureOrderLink(): Promise<OrderLinkResult> {
 
   if (!profile?.company_id) {
     return { ok: false, message: "Your account isn't assigned to a company." };
+  }
+
+  if (!(await requireFeature("customer_links"))) {
+    return {
+      ok: false,
+      message: "Customer order links are on the Pro plan and up.",
+    };
   }
 
   const { data: existing } = await supabase

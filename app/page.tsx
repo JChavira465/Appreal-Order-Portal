@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
 import { signOut } from "./logout/actions";
 import { PinForm } from "./PinForm";
 import { AddRepForm } from "./AddRepForm";
@@ -101,9 +102,19 @@ export default async function HomePage() {
         .order("full_name")
     : { data: null };
 
+  // Customer order links are a paid feature (0037), so the card only
+  // appears for a shop whose plan includes it. RLS refuses the insert
+  // either way -- this just keeps a button off the screen that would
+  // only ever explain why it can't be used.
+  const plan = profile?.company_id
+    ? await loadCompanyPlan(supabase, profile.company_id)
+    : null;
+  const canUseOrderLinks =
+    plan !== null && planAllows(plan, "customer_links");
+
   // Their own customer order link, if they've made one already -- RLS
   // scopes order_links to the caller's own row for a rep.
-  const { data: orderLink } = !isPlatformAdmin
+  const { data: orderLink } = canUseOrderLinks
     ? await supabase
         .from("order_links")
         .select("token")
@@ -263,6 +274,15 @@ export default async function HomePage() {
 
           {isSuperAdmin && (
             <Link
+              href="/billing"
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
+            >
+              Plan &amp; Billing
+            </Link>
+          )}
+
+          {isSuperAdmin && (
+            <Link
               href="/company"
               className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
             >
@@ -289,7 +309,7 @@ export default async function HomePage() {
           )}
         </div>
 
-        {!isPlatformAdmin && <OrderLinkCard initialToken={orderLinkToken} />}
+        {canUseOrderLinks && <OrderLinkCard initialToken={orderLinkToken} />}
 
         <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
           <PinForm />

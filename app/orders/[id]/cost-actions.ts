@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
 
 export type ActionResult = { ok: boolean; message: string } | null;
 
@@ -18,13 +19,21 @@ async function requireManager() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id, platform_admin")
     .eq("id", user.id)
     .single();
 
   if (profile?.role !== "manager" && profile?.role !== "super_admin") {
     return null;
   }
+
+  // Cost tracking is a paid feature (0037). RLS already refuses the
+  // write, but that surfaces as a generic "could not save" -- checking
+  // here lets the caller say which plan this needs.
+  const plan = await loadCompanyPlan(supabase, profile.company_id ?? "");
+  plan.isPlatformAdmin = profile.platform_admin === true;
+  if (!planAllows(plan, "costs")) return null;
+
   return supabase;
 }
 
@@ -33,7 +42,7 @@ export async function setLineCost(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can set cost." };
+  if (!supabase) return { ok: false, message: "Cost tracking is on the Pro plan and up." };
 
   const orderId = String(formData.get("orderId") ?? "");
   const orderItemId = String(formData.get("orderItemId") ?? "");
@@ -64,7 +73,7 @@ export async function setOrderCosts(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await requireManager();
-  if (!supabase) return { ok: false, message: "Only a manager can set cost." };
+  if (!supabase) return { ok: false, message: "Cost tracking is on the Pro plan and up." };
 
   const orderId = String(formData.get("orderId") ?? "");
   const manufacturerId = String(formData.get("manufacturerId") ?? "").trim();

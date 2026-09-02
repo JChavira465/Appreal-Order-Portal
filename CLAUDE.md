@@ -61,7 +61,7 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 2** (guides last regenerated August 30,
+- **Changes since last guide update: 4** (guides last regenerated August 30,
   2026)
 
 ## Before running any check the user asks for
@@ -88,7 +88,8 @@ select
            where tablename = 'price_modifiers'
              and policyname = 'price_modifiers_select'
              and qual like '%company_id = current_company_id()%') as has_0035,
-  to_regclass('public.company_settings')  is not null as has_0036;
+  to_regclass('public.company_settings')  is not null as has_0036,
+  to_regproc('public.has_feature(text)')  is not null as has_0037;
 ```
 
 ## Things that have bitten us before

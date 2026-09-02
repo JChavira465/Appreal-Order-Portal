@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pinToPassword } from "@/lib/pin";
+import { isTier } from "@/lib/plans";
 
 export type CreateCompanyResult = { ok: boolean; message: string } | null;
 
@@ -214,4 +215,37 @@ export async function deleteCompany(
 
   revalidatePath("/admin/companies");
   return { ok: true, message: "Company deleted." };
+}
+
+export type SetTierResult = { ok: boolean; message: string };
+
+// The manual override on top of Stripe. Two cases this exists for that
+// billing alone can't cover: comping a beta tester onto Unlimited, and
+// fixing a company whose webhook didn't land. Deliberately does NOT
+// touch stripe_subscription_id or billing_status -- whatever they're
+// actually paying stays whatever they're actually paying, and the next
+// webhook is still free to correct the tier. This changes what they can
+// use, not what they owe.
+export async function setCompanyTier(
+  companyId: string,
+  tier: string,
+): Promise<SetTierResult> {
+  const { supabase, isPlatformAdmin } = await requirePlatformAdmin();
+  if (!isPlatformAdmin) {
+    return { ok: false, message: "Only the platform admin can do this." };
+  }
+  if (!isTier(tier)) return { ok: false, message: "Unknown plan." };
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ tier })
+    .eq("id", companyId);
+
+  if (error) {
+    console.error("setCompanyTier: update failed", error);
+    return { ok: false, message: "Could not change the plan." };
+  }
+
+  revalidatePath("/admin/companies");
+  return { ok: true, message: "Plan updated." };
 }

@@ -11,7 +11,19 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
 // the customer has no account, and the token is what identifies the
 // company/rep, so it has to stay reachable without a session (same trust
 // model as /track/ above).
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/track/", "/order/"];
+// /api/stripe/webhook is called by Stripe's servers, which have no
+// session and never will -- without this it would be bounced to /login
+// and every subscription change would silently never arrive. It does its
+// own authentication, and a stronger kind than a session: the request
+// body must carry a valid signature from the Stripe webhook secret, so
+// an unsigned POST here is rejected inside the route itself.
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/track/",
+  "/order/",
+  "/api/stripe/webhook",
+];
 
 // Vercel kills a middleware invocation outright at 25s with a raw 504 --
 // no chance to respond gracefully. Supabase's getUser() call occasionally

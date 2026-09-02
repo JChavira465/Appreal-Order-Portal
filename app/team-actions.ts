@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pinToPassword } from "@/lib/pin";
+import { loadCompanyPlan } from "@/lib/companyPlan";
+import { PLANS, seatLimit } from "@/lib/plans";
 
 export type AddStaffResult = { ok: boolean; message: string } | null;
 
@@ -60,6 +62,28 @@ async function createStaffAccount(
   }
   if (!companyId) {
     return { ok: false, message: "Your own account isn't assigned to a company." };
+  }
+
+  // Seat limit for the company's plan. Counted here rather than in RLS
+  // because "how many rows already exist" is awkward to express in a
+  // policy and the failure needs to name a number the owner can act on.
+  // Only active accounts count -- deactivating someone who left should
+  // free their seat, not leave a shop paying for a ghost.
+  const admin0 = createAdminClient();
+  const plan = await loadCompanyPlan(admin0, companyId);
+  const limit = seatLimit(plan.tier);
+  if (limit !== null) {
+    const { count } = await admin0
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .eq("active", true);
+    if ((count ?? 0) >= limit) {
+      return {
+        ok: false,
+        message: `The ${PLANS[plan.tier].name} plan includes ${limit} staff accounts and you're using all of them. Upgrade, or deactivate someone who's left.`,
+      };
+    }
   }
 
   const slug = slugify(fullName);

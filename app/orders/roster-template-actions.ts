@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireFeature } from "@/lib/companyPlan";
 
 export type RosterTemplateEntry = { name: string; number: string; size: string };
 
@@ -37,6 +38,10 @@ export async function saveRosterTemplate(
   const real = entries.filter((e) => e.name.trim() || e.number.trim());
   if (real.length === 0) {
     return { ok: false, message: "Nothing to save -- add some names first." };
+  }
+
+  if (!(await requireFeature("roster_templates"))) {
+    return { ok: false, message: "Saved rosters are on the Pro plan and up." };
   }
 
   const supabase = await createClient();

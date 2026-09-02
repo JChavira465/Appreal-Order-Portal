@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
+import { UpgradeNotice } from "../../UpgradeNotice";
 import { VendorItemCostRow } from "./VendorItemCostRow";
 
 const KIND_LABEL: Record<string, string> = {
@@ -31,7 +33,7 @@ export default async function VendorDetailPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, company_id, platform_admin")
     .eq("id", user.id)
     .single();
   const isManager =
@@ -47,6 +49,17 @@ export default async function VendorDetailPage({
           Only a manager can view vendor pricing.
         </div>
       </main>
+    );
+  }
+
+  // Same plan gate as /vendors. Without it, a shop that downgraded would
+  // land here from an old link and see "vendor not found" -- technically
+  // what RLS returns, but a confusing way to say "this is on Pro".
+  const plan = await loadCompanyPlan(supabase, profile?.company_id ?? "");
+  plan.isPlatformAdmin = profile?.platform_admin === true;
+  if (!planAllows(plan, "costs")) {
+    return (
+      <UpgradeNotice feature="costs" isOwner={profile?.role === "super_admin"} />
     );
   }
 

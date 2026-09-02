@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
+import { UpgradeNotice } from "../UpgradeNotice";
 import { loadCatalog, money } from "@/lib/catalog";
 import { ReportsExport } from "./ReportsExport";
 
@@ -52,7 +54,7 @@ export default async function ReportsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, company_id")
+    .select("role, company_id, platform_admin")
     .eq("id", user.id)
     .single();
   const isManager =
@@ -68,6 +70,21 @@ export default async function ReportsPage() {
           Only a manager can view reports.
         </div>
       </main>
+    );
+  }
+
+  // Plan gate. The database enforces this too (has_feature in 0037) --
+  // that's what actually stops a request that never loads this page.
+  // This is here so the shop gets an explanation of what they'd be
+  // buying instead of a screen that silently comes back empty.
+  const plan = await loadCompanyPlan(supabase, profile?.company_id ?? "");
+  plan.isPlatformAdmin = profile?.platform_admin === true;
+  if (!planAllows(plan, "costs")) {
+    return (
+      <UpgradeNotice
+        feature="costs"
+        isOwner={profile?.role === "super_admin"}
+      />
     );
   }
 

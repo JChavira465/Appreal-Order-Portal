@@ -205,6 +205,9 @@ lib/
   tracking.ts                  carrier list for shipment tracking numbers
   ai-mockup.ts                 calls OpenAI's gpt-image-2 for the AI concept feature
   shopInfo.ts                  loads a company's standing terms (payment/turnaround/tax)
+  plans.ts                     the three tiers, their prices and which features each unlocks
+  companyPlan.ts               loads a company's plan/billing state; requireFeature() gate
+  stripe.ts                    Stripe client + tier<->price mapping, inert without keys
   like.ts                      escapes SQL LIKE wildcards before an ilike match
 supabase/migrations/           see below
 ```
@@ -262,9 +265,69 @@ supabase/migrations/           see below
 0036_shop_info.sql            company_settings table (payment terms, turnaround, tax/shipping
                                  note), kept separate from `companies` so an owner editing
                                  their own terms can't reach `active` or `slug`
+0037_plans_and_billing.sql    tier + billing columns on companies, has_feature()/
+                                 tier_seat_limit(), and RLS on every gated table so a plan
+                                 can't be bypassed through PostgREST
 ```
 
 ## Changelog
+
+### September 1, 2026 — Plans, billing, and a company switcher
+
+Three tiers, priced so the middle one is the obvious answer for a real
+shop:
+
+| | Starter | Pro | Unlimited |
+|---|---|---|---|
+| Monthly | $99 | $199 | $299 |
+| Yearly | $990 | $1,990 | $2,990 |
+| Staff | 3 | 10 | unlimited |
+
+Yearly is 10× monthly — "two months free" is easy to say out loud and
+easy for a shop owner to verify, which matters more than optimizing a
+percentage.
+
+Everything core is on every plan: taking orders, pricing, customers,
+staff PINs, public tracking links, receipts, shop info. **Pro** adds cost
+tracking and profit reports, customer order links, saved rosters, and hat
+orders. **Unlimited** adds partner splits, vendor payments, and AI design
+concepts.
+
+Two of those placements are deliberate rather than arbitrary. AI concepts
+sit on the top tier because every generation costs the platform real
+money at the image API — it's the one feature with per-use cost, so it
+belongs where the margin is. Cost tracking sits on Pro because it's the
+feature that separates "I write orders down" from "I run a business,"
+and that's exactly the moment a shop is willing to pay more.
+
+**Enforcement is in the database, not the UI.** `has_feature()` is called
+from the RLS policies on every gated table, so a shop can't reach a paid
+feature by hitting PostgREST directly with the public anon key — which
+they could, if this were only a hidden button. The app-layer checks exist
+so people get an explanation of what they'd be buying instead of a screen
+that silently comes back empty.
+
+**Billing runs through Stripe** and is entirely optional: with no keys
+set, the app behaves exactly as before and the platform admin assigns
+tiers by hand. With keys set, an owner picks a plan, pays through Stripe
+Checkout, and manages their own card and invoices in Stripe's hosted
+portal. The webhook is the only thing that can mark a company paid —
+nothing in the app's own UI can, which is what stops a shop from granting
+itself a plan.
+
+A failed payment (`past_due`) deliberately keeps full access. An expired
+card is not a shop that decided to leave, and locking someone out of
+their own order history mid-season over $99 costs far more goodwill than
+the week Stripe spends retrying. Only a genuine cancellation locks out,
+and it does so through the existing suspension lever rather than a second
+mechanism.
+
+**Company switcher.** The platform admin now gets a dropdown at the top
+of every screen listing every company; picking one drops you into that
+company's side, with a banner showing whose data you're looking at and an
+Exit button. It stays on the current screen where that screen understands
+assist mode, and lands on the Order Board where it doesn't. Nothing about
+this needed a custom domain.
 
 ### September 1, 2026 — Shop info
 

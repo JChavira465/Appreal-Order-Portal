@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateCompanyForm } from "./CreateCompanyForm";
 import { DeleteCompanyButton } from "./DeleteCompanyButton";
 import { SuspendCompanyButton } from "./SuspendCompanyButton";
+import { TierSelect } from "./TierSelect";
+import { BILLING_STATUS_COPY, isBillingStatus, isTier } from "@/lib/plans";
 
 export default async function AdminCompaniesPage() {
   const supabase = await createClient();
@@ -42,7 +44,7 @@ export default async function AdminCompaniesPage() {
 
   const { data: companies } = await supabase
     .from("companies")
-    .select("id, name, slug, active, created_at")
+    .select("id, name, slug, active, created_at, tier, billing_status")
     .order("created_at", { ascending: false });
 
   return (
@@ -102,6 +104,16 @@ export default async function AdminCompaniesPage() {
                   Backup
                 </a>
               </div>
+              <TierSelect
+                companyId={c.id}
+                tier={isTier(c.tier) ? c.tier : "starter"}
+                billingStatus={
+                  isBillingStatus(c.billing_status)
+                    ? BILLING_STATUS_COPY[c.billing_status]
+                    : "Free trial"
+                }
+              />
+
               <SuspendCompanyButton
                 companyId={c.id}
                 companyName={c.name}

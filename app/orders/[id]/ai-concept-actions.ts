@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireFeature } from "@/lib/companyPlan";
 import { uploadGeneratedOrderImage } from "@/lib/order-images";
 import { generateMockupImage } from "@/lib/ai-mockup";
 
@@ -22,6 +23,17 @@ export async function generateAiConcept(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Not signed in." };
+
+  // Checked before anything else, because every generation past this
+  // line costs real money at the image API -- an unpaid plan must never
+  // be able to spend it. Same reasoning as the order-visibility check
+  // below, one step earlier in the same chain.
+  if (!(await requireFeature("ai_concepts"))) {
+    return {
+      ok: false,
+      message: "AI design concepts are on the Unlimited plan.",
+    };
+  }
 
   // Confirm the caller can actually see this order BEFORE spending money
   // on a generation. RLS already stops the image from being saved to an
