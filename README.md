@@ -287,6 +287,25 @@ supabase/migrations/           see below
 
 ## Changelog
 
+### September 3, 2026 — Real screens on the landing page
+
+The landing page described the product without ever showing it. Three
+screenshots now sit under the hero: an order with a five-player roster on
+it, a customer's own order form headed with the shop's name and terms,
+and a balance due with Venmo and Cash App buttons.
+
+They're captured from the running app, not drawn — a temporary route
+rendered the actual `OrderForm`, `CustomerOrderForm` and `PayPanel`
+components with obviously-fake demo data (Northside Wildcats 12U,
+Strikeout Nation Apparel), Playwright photographed them at phone width,
+and the route was deleted. So the images can never drift from the real
+UI the way a mock-up does, and no real customer's order is sitting on a
+public marketing page.
+
+Also removed a duplicated "Reference photos" heading on the new-order
+form — the section header and the field label rendered identically, one
+directly above the other. It only became obvious in a screenshot.
+
 ### September 3, 2026 — Apparel Logic, and a front door
 
 Renamed from "Order Desk", which turned out to be an existing ecommerce

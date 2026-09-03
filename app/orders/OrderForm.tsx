@@ -1186,9 +1186,6 @@ export function OrderForm({
 
       {!isEdit && (
         <div className="mt-6 border-t border-neutral-100 pt-5">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
-            Reference photos
-          </h3>
           <Field label="Reference photos">
             <input
               name="referenceImages"

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS, TIERS, TRIAL_DAYS } from "@/lib/plans";
@@ -7,6 +8,36 @@ export const metadata = {
   description:
     "Order management built for the way team apparel is actually sold: rosters with names and numbers, size runs, vendor minimums and customers who pay by Venmo.",
 };
+
+// The three screens on the landing page, in the order a shop actually
+// meets them: the order goes in, the customer fills one out themselves,
+// the customer pays it. Captured from the running app at phone width.
+const SCREENS = [
+  {
+    src: "/shot-roster.png",
+    width: 860,
+    height: 1760,
+    alt: "An order being built: a jersey with add-ons and a roster of five players with names, numbers and sizes.",
+    title: "The roster, in the order",
+    body: "Names, numbers and sizes on the piece they belong to — pasted in from the coach's list.",
+  },
+  {
+    src: "/shot-customer.png",
+    width: 860,
+    height: 2160,
+    alt: "A customer order form headed with a shop's name, its payment terms and turnaround, and a size grid.",
+    title: "Your customer's own form",
+    body: "One link, your prices, your terms. It lands in your queue already filled out.",
+  },
+  {
+    src: "/shot-pay.png",
+    width: 860,
+    height: 1240,
+    alt: "A balance due of $412.50 with the reference #1042 Northside Wildcats 12U and Venmo and Cash App buttons.",
+    title: "Paid against the order",
+    body: "Venmo or Cash App opens with the amount and the reference already in it.",
+  },
+];
 
 // The public landing page. Deliberately at "/" and deliberately not
 // behind a login: the whole reason it exists is that a shop owner who
@@ -76,6 +107,42 @@ export default async function LandingPage() {
             Start {TRIAL_DAYS} days free
           </Link>
           <span className="text-sm text-neutral-500">No card needed.</span>
+        </div>
+      </section>
+
+
+      {/* ---------- what it actually looks like ---------- */}
+      {/* Real screens, captured from the running app with demo data --
+          never a mock-up, and never a real customer's order. */}
+      <section className="mx-auto max-w-4xl px-5 pb-6 pt-8">
+        <div className="grid gap-8 sm:grid-cols-3 sm:gap-5">
+          {SCREENS.map((screen) => (
+            <figure key={screen.src} className="m-0">
+              {/* Fixed height with object-top: the three screens are
+                  naturally different lengths, and a ragged row of
+                  half-height cards reads as broken rather than as three
+                  phones. Each one is cropped from the top, so the crop
+                  only ever cuts off the bottom of a scrolling screen. */}
+              <div className="h-[440px] overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm sm:h-[420px]">
+                <Image
+                  src={screen.src}
+                  alt={screen.alt}
+                  width={screen.width}
+                  height={screen.height}
+                  className="h-full w-full object-cover object-top"
+                  sizes="(min-width: 640px) 33vw, 100vw"
+                />
+              </div>
+              <figcaption className="mt-3">
+                <span className="text-sm font-bold text-black">
+                  {screen.title}
+                </span>
+                <span className="block text-sm leading-relaxed text-neutral-600">
+                  {screen.body}
+                </span>
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </section>
 
