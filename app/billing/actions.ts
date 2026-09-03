@@ -7,6 +7,21 @@ import { isTier, type Tier } from "@/lib/plans";
 
 export type BillingActionResult = { ok: boolean; message: string; url?: string };
 
+// Stripe's own error messages are written to be shown to people ("Your
+// account cannot currently make live charges", "No such price"), and
+// they name the actual problem -- which a generic "try again" never
+// does, and which nobody can act on without server logs. Passed through
+// where one exists, with a plain fallback where it doesn't.
+function stripeMessage(error: unknown, action: string): string {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message: unknown }).message)
+      : "";
+  return message
+    ? `Stripe couldn't ${action}: ${message}`
+    : `Could not ${action}. Try again.`;
+}
+
 // Only a company's own owner can start or change a subscription -- this
 // is the person whose card it is. A manager runs the shop day to day but
 // doesn't sign up for a bill, and a rep certainly doesn't.
@@ -78,15 +93,38 @@ export async function startCheckout(
 
   let customerId = company.stripe_customer_id as string | null;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      name: company.name,
-      metadata: { company_id: actor.companyId, slug: company.slug },
-    });
-    customerId = customer.id;
-    await admin
+    // Was outside a try/catch, so any Stripe failure here -- an
+    // unactivated live account, a restricted key, a network blip --
+    // escaped as an unhandled exception and became a bare 500 with no
+    // message at all. A server action that talks to a third party has to
+    // assume it can fail.
+    try {
+      const customer = await stripe.customers.create({
+        name: company.name,
+        metadata: { company_id: actor.companyId, slug: company.slug },
+      });
+      customerId = customer.id;
+    } catch (error) {
+      console.error("startCheckout: Stripe customer creation failed", error);
+      return { ok: false, message: stripeMessage(error, "set up billing") };
+    }
+
+    // If this write is lost, the next attempt creates a second Stripe
+    // customer for the same company -- two customers, two possible
+    // subscriptions, and a webhook that can no longer tell which is
+    // real. Better to stop here than to build on a broken link.
+    const { error: saveError } = await admin
       .from("companies")
       .update({ stripe_customer_id: customerId })
       .eq("id", actor.companyId);
+
+    if (saveError) {
+      console.error("startCheckout: could not save stripe_customer_id", saveError);
+      return {
+        ok: false,
+        message: "Could not save your billing account. Try again.",
+      };
+    }
   }
 
   try {
@@ -112,7 +150,7 @@ export async function startCheckout(
     return { ok: true, message: "Redirecting to checkout…", url: session.url };
   } catch (error) {
     console.error("startCheckout: Stripe checkout session failed", error);
-    return { ok: false, message: "Could not start checkout. Try again." };
+    return { ok: false, message: stripeMessage(error, "start checkout") };
   }
 }
 
@@ -156,6 +194,6 @@ export async function openBillingPortal(): Promise<BillingActionResult> {
     return { ok: true, message: "Opening billing…", url: session.url };
   } catch (error) {
     console.error("openBillingPortal: Stripe portal session failed", error);
-    return { ok: false, message: "Could not open billing. Try again." };
+    return { ok: false, message: stripeMessage(error, "open billing") };
   }
 }
