@@ -114,9 +114,15 @@ export async function signIn(
 
   if (isValidSlug(company?.slug)) {
     const jar = await cookies();
+    // Only ever read server-side (app/login/page.tsx), so there is no
+    // reason for script to reach it. httpOnly costs nothing here and
+    // takes it off the table for anything that manages to run JS on the
+    // page; secure keeps it off plaintext connections in production.
     jar.set(LAST_COMPANY_COOKIE, company.slug, {
       maxAge: LAST_COMPANY_MAX_AGE,
       sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
     });
   }

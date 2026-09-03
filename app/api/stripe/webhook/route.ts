@@ -87,6 +87,31 @@ async function applySubscription(subscription: Stripe.Subscription) {
     patch.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString();
   }
 
+  // The customer-id fallback exists for subscriptions created straight
+  // in the Stripe dashboard, which carry no company_id metadata. It
+  // matches on a column with no uniqueness constraint, so before writing
+  // through it, confirm it identifies exactly one company. Two companies
+  // sharing a customer id should never happen -- startCheckout creates a
+  // fresh customer per company -- but if it ever did, a single
+  // subscription event would silently rewrite the tier and billing state
+  // of a company that had nothing to do with it. Refusing is the right
+  // answer: the 500 below makes Stripe retry and leaves a log naming the
+  // customer, rather than quietly corrupting two rows.
+  if (!companyId) {
+    const { data: matches } = await admin
+      .from("companies")
+      .select("id")
+      .eq("stripe_customer_id", customerId ?? "");
+
+    if (!matches || matches.length !== 1) {
+      console.error(
+        "stripe webhook: customer id does not identify exactly one company",
+        { customerId, matched: matches?.length ?? 0, subscription: subscription.id },
+      );
+      throw new Error("ambiguous customer -> company mapping");
+    }
+  }
+
   const query = admin.from("companies").update(patch);
   const { data, error } = companyId
     ? await query.eq("id", companyId).select("id")
