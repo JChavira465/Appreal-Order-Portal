@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { LAST_COMPANY_COOKIE, isValidSlug } from "@/lib/lastCompany";
 import { LoginForm } from "./LoginForm";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -22,7 +24,18 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ company?: string; error?: string }>;
 }) {
-  const { company: companySlug, error } = await searchParams;
+  const { company: companyParam, error } = await searchParams;
+
+  // Fall back to the last company this browser signed into. Covers every
+  // way of arriving here without the link: a bookmark of bare /login, the
+  // middleware bouncing an expired session, or someone tapping back.
+  // The URL always wins when it says something.
+  const remembered = (await cookies()).get(LAST_COMPANY_COOKIE)?.value;
+  const companySlug = isValidSlug(companyParam)
+    ? companyParam
+    : isValidSlug(remembered)
+      ? remembered
+      : null;
   // Mapped to a fixed set rather than rendered as-is. React escapes the
   // value so this was never an XSS, but ?error= is attacker-controlled
   // and anything echoed here reads to the user as if the app said it --

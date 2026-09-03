@@ -1,9 +1,15 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pinToPassword } from "@/lib/pin";
+import {
+  LAST_COMPANY_COOKIE,
+  LAST_COMPANY_MAX_AGE,
+  isValidSlug,
+} from "@/lib/lastCompany";
 
 export type AuthResult = { ok: boolean; message: string } | null;
 
@@ -88,6 +94,31 @@ export async function signIn(
       .from("profiles")
       .update({ failed_pin_attempts: 0, pin_locked_until: null })
       .eq("id", userId);
+  }
+
+  // Remember which company's sign-in screen this was, so signing out or
+  // a session expiring doesn't strand them on "No company specified".
+  const { data: signedIn } = await admin
+    .from("profiles")
+    .select("company_id")
+    .eq("id", userId)
+    .single();
+
+  const { data: company } = signedIn?.company_id
+    ? await admin
+        .from("companies")
+        .select("slug")
+        .eq("id", signedIn.company_id)
+        .maybeSingle()
+    : { data: null };
+
+  if (isValidSlug(company?.slug)) {
+    const jar = await cookies();
+    jar.set(LAST_COMPANY_COOKIE, company.slug, {
+      maxAge: LAST_COMPANY_MAX_AGE,
+      sameSite: "lax",
+      path: "/",
+    });
   }
 
   // For /company's "Team activity" -- insert as the now-authenticated
