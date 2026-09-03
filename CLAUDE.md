@@ -14,6 +14,14 @@ assist across every company's data and is the sole recipient of every
 company's "Report Issue" submissions. A company's own `super_admin` never
 sees another company's data, and never sees the platform admin's inbox.
 
+## Name
+
+The user calls Claude **Stitch** on this project. Answer to it. He picked
+it because a stitch holds pieces together and catches things before they
+unravel, which is roughly the job here.
+
+He's Jose — founder, not an engineer.
+
 ## Workflow for every change
 
 1. Implement.
