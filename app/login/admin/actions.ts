@@ -33,5 +33,5 @@ export async function adminSignIn(
     return { ok: false, message: "Email or password incorrect." };
   }
 
-  redirect("/");
+  redirect("/home");
 }

@@ -18,7 +18,7 @@ export function SignupForm() {
   // to put them somewhere useful. Done here rather than with redirect()
   // in the action so the success state can render first.
   useEffect(() => {
-    if (state?.ok) router.push("/");
+    if (state?.ok) router.push("/home");
   }, [state?.ok, router]);
 
   if (state?.ok) {

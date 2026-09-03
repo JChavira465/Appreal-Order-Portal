@@ -119,7 +119,7 @@ export default async function OrderReceiptPage({
       </div>
 
       <div className="text-center">
-        <h1 className="font-script text-3xl text-black">Order Desk</h1>
+        <h1 className="font-script text-3xl text-black">Apparel Logic</h1>
         <p className="mt-1 text-sm text-neutral-500">Order Receipt</p>
       </div>
 

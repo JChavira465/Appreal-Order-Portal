@@ -28,6 +28,14 @@ const PUBLIC_PATHS = [
   "/signup",
 ];
 
+// Paths matched WHOLE, not by prefix. "/" is the marketing landing page
+// and has to be reachable signed-out -- but it cannot go in PUBLIC_PATHS
+// above, because that list is matched with startsWith() and every path
+// on the site starts with "/". Adding it there would silently make the
+// entire application public. Kept as a separate exact-match list so that
+// can never happen by someone appending to the wrong array.
+const PUBLIC_EXACT_PATHS = ["/"];
+
 // Vercel kills a middleware invocation outright at 25s with a raw 504 --
 // no chance to respond gracefully. Supabase's getUser() call occasionally
 // stalls under heavy concurrent load (real-world usage shouldn't come
@@ -68,7 +76,9 @@ export async function updateSession(request: NextRequest) {
   ]);
 
   const path = request.nextUrl.pathname;
-  const isPublicPath = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  const isPublicPath =
+    PUBLIC_EXACT_PATHS.includes(path) ||
+    PUBLIC_PATHS.some((p) => path.startsWith(p));
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
@@ -76,9 +86,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Already signed in and landing on the sign-in screen: send them to
+  // their dashboard, which moved off "/" when that became the public
+  // landing page.
   if (user && path === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/home";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

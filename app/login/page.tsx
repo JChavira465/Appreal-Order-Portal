@@ -52,7 +52,7 @@ export default async function LoginPage({
     <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12">
       <div className="w-full max-w-sm">
         <h1 className="font-script mb-1 text-center text-5xl leading-tight text-black">
-          Order Desk
+          Apparel Logic
         </h1>
 
         {errorMessage && (

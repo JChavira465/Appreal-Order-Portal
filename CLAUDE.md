@@ -1,4 +1,4 @@
-# Apparel Order Portal — notes for Claude
+# Apparel Logic — notes for Claude
 
 Next.js 15 (App Router) + TypeScript + Tailwind + Supabase order-management
 platform, built by Jose Chavira. Deployed via Vercel. Repo:
@@ -13,6 +13,20 @@ one **platform admin** (`profiles.platform_admin = true`), who can see and
 assist across every company's data and is the sole recipient of every
 company's "Report Issue" submissions. A company's own `super_admin` never
 sees another company's data, and never sees the platform admin's inbox.
+
+## Product name and routing
+
+The product is **Apparel Logic**. It was called "Order Desk" until
+September 3, 2026 -- that name belongs to an existing ecommerce SaaS
+(orderdesk.com), so it was changed before the domain was bought. The
+repo is still `Appreal-Order-Portal`; the "Appreal" there is a typo from
+day one, not the brand.
+
+`/` is the public marketing landing page. The signed-in dashboard lives
+at **`/home`**. Middleware keeps `/` reachable signed-out through
+`PUBLIC_EXACT_PATHS`, which is matched whole -- `/` can never go in
+`PUBLIC_PATHS`, which is matched with `startsWith()` and would make the
+entire app public.
 
 ## Name
 
@@ -69,8 +83,8 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 4** (guides last regenerated
-  September 3, 2026)
+- **Changes since last guide update: 5 — REGENERATE BOTH GUIDES NEXT**
+  (guides last regenerated September 3, 2026)
 
 ## Scheduled routines (standing instructions from the user)
 

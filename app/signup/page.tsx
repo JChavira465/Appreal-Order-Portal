@@ -3,14 +3,14 @@ import { SignupForm } from "./SignupForm";
 import { PLANS, TRIAL_DAYS } from "@/lib/plans";
 
 export const metadata = {
-  title: "Start your shop — Order Desk",
+  title: "Start your shop — Apparel Logic",
 };
 
 export default function SignupPage() {
   return (
     <main className="mx-auto max-w-sm px-6 py-10">
       <h1 className="font-script mb-1 text-center text-4xl leading-tight text-black">
-        Order Desk
+        Apparel Logic
       </h1>
       <p className="mb-8 text-center text-sm text-neutral-500">
         Team apparel orders, off the group chat.

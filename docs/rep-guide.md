@@ -1,9 +1,9 @@
-# Order Desk — Rep Guide
+# Apparel Logic — Rep Guide
 
 _Last updated: September 3, 2026_
 
 This is everything you need to know to take an order, track it, and get paid
-using the Order Desk.
+using the Apparel Logic.
 
 ## Signing in
 

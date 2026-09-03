@@ -32,7 +32,7 @@ export function AssistSwitcher({
   const go = (slug: string) => {
     if (!slug) {
       // Leaving assist mode: back to your own platform-admin home.
-      router.push("/");
+      router.push("/home");
       return;
     }
     router.push(`${assistTargetFor(pathname)}?company=${slug}`);

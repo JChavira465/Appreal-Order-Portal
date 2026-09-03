@@ -48,7 +48,7 @@ export default async function BillingPage() {
   if (profile?.platform_admin === true) {
     return (
       <main className="mx-auto max-w-lg px-5 py-6">
-        <Link href="/" className="text-xs text-neutral-400 underline">
+        <Link href="/home" className="text-xs text-neutral-400 underline">
           ← Home
         </Link>
         <div className="mt-6 rounded-xl border-2 border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-400">
@@ -67,7 +67,7 @@ export default async function BillingPage() {
   if (!companyId) {
     return (
       <main className="mx-auto max-w-lg px-5 py-6">
-        <Link href="/" className="text-xs text-neutral-400 underline">
+        <Link href="/home" className="text-xs text-neutral-400 underline">
           ← Home
         </Link>
         <div className="mt-6 rounded-xl border-2 border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
@@ -105,7 +105,7 @@ export default async function BillingPage() {
 
   return (
     <main className="mx-auto max-w-lg px-5 py-6">
-      <Link href="/" className="text-xs text-neutral-400 underline">
+      <Link href="/home" className="text-xs text-neutral-400 underline">
         ← Home
       </Link>
 

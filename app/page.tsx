@@ -1,470 +1,215 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
-import { isBillingStatus, trialHasExpired, type BillingStatus } from "@/lib/plans";
-import { signOut } from "./logout/actions";
-import { PinForm } from "./PinForm";
-import { AddRepForm } from "./AddRepForm";
-import { AddManagerForm } from "./AddManagerForm";
-import { StaffRow } from "./StaffRow";
-import { OrderLinkCard } from "./OrderLinkCard";
+import { PLANS, TIERS, TRIAL_DAYS } from "@/lib/plans";
 
-const ROLE_LABEL: Record<string, string> = {
-  rep: "Rep",
-  manager: "Manager",
-  super_admin: "Super Admin",
+export const metadata = {
+  title: "Apparel Logic — team apparel orders, off the group chat",
+  description:
+    "Order management built for the way team apparel is actually sold: rosters with names and numbers, size runs, vendor minimums and customers who pay by Venmo.",
 };
 
-function daysUntil(dateStr: string): number | null {
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((d.getTime() - today.getTime()) / 86400000);
-}
-
-export default async function HomePage() {
+// The public landing page. Deliberately at "/" and deliberately not
+// behind a login: the whole reason it exists is that a shop owner who
+// was pitched on Tuesday looks the company up on Thursday, and until now
+// they landed on a sign-in screen, which reads as "somebody gave me a
+// tool" rather than "this is a real product I should buy".
+//
+// The dashboard that used to live here moved to /home.
+export default async function LandingPage() {
+  // Signed-in visitors get a way back to their own shop rather than a
+  // "start free trial" button they've already used. Only ever changes a
+  // link's label -- nothing on this page is gated.
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role, orders_viewed_at, platform_admin, company_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.company_id) {
-    // companies_select's RLS lets a member see their own company row
-    // regardless of active status (see 0032), specifically so this check
-    // can render a clear message instead of every other query on this
-    // page just silently coming back empty with no explanation.
-    const { data: company } = await supabase
-      .from("companies")
-      .select("name, active, billing_status, trial_ends_at")
-      .eq("id", profile.company_id)
-      .single();
-
-    if (company && !company.active) {
-      return (
-        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
-          <div className="w-full max-w-sm">
-            <h1 className="mb-4 text-lg font-bold text-black">
-              Account suspended
-            </h1>
-            <p className="text-sm text-neutral-500">
-              {company.name}&apos;s account is currently suspended. Contact
-              the platform admin to resolve this.
-            </p>
-            <form action={signOut} className="mt-8">
-              <button
-                type="submit"
-                className="text-xs text-neutral-400 underline"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </main>
-      );
-    }
-
-    // A canceled subscription closes every door through billing_status
-    // alone -- the webhook no longer touches companies.active, so this
-    // never reaches the "suspended" branch above and would otherwise
-    // land on a home page whose every query silently returns nothing.
-    if (company && company.billing_status === "canceled") {
-      const isOwner = profile?.role === "super_admin";
-      return (
-        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
-          <div className="w-full max-w-sm">
-            <h1 className="mb-4 text-lg font-bold text-black">
-              Your subscription has ended
-            </h1>
-            <p className="text-sm text-neutral-500">
-              {company.name}&apos;s plan was cancelled. Your orders and
-              everything else are safe — start a plan again and it all comes
-              straight back.
-            </p>
-            {isOwner ? (
-              <Link
-                href="/billing"
-                className="mt-6 block rounded-lg bg-black px-4 py-3 text-sm font-medium text-white"
-              >
-                See plans
-              </Link>
-            ) : (
-              <p className="mt-6 text-xs text-neutral-500">
-                Ask the account owner to start a plan again.
-              </p>
-            )}
-            <form action={signOut} className="mt-8">
-              <button
-                type="submit"
-                className="text-xs text-neutral-400 underline"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </main>
-      );
-    }
-
-    // An expired trial closes the same doors suspension does (0039), so
-    // without this the shop would land on a home page whose every query
-    // silently returns nothing. Deliberately a different screen from
-    // suspension: this one has an obvious way out, and the owner can
-    // take it themselves.
-    const expired =
-      isBillingStatus(company?.billing_status ?? "") &&
-      trialHasExpired(
-        company!.billing_status as BillingStatus,
-        company!.trial_ends_at ?? null,
-      );
-
-    if (company && expired) {
-      const isOwner = profile?.role === "super_admin";
-      return (
-        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
-          <div className="w-full max-w-sm">
-            <h1 className="mb-4 text-lg font-bold text-black">
-              Your free trial has ended
-            </h1>
-            <p className="text-sm text-neutral-500">
-              {company.name}&apos;s trial is over. Your orders and everything
-              else are safe — pick a plan and it all comes straight back.
-            </p>
-            {isOwner ? (
-              <Link
-                href="/billing"
-                className="mt-6 block rounded-lg bg-black px-4 py-3 text-sm font-medium text-white"
-              >
-                See plans
-              </Link>
-            ) : (
-              <p className="mt-6 text-xs text-neutral-500">
-                Ask the account owner to pick a plan.
-              </p>
-            )}
-            <form action={signOut} className="mt-8">
-              <button
-                type="submit"
-                className="text-xs text-neutral-400 underline"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </main>
-      );
-    }
-  }
-
-  const isManager = profile?.role === "manager" || profile?.role === "super_admin";
-  const isSuperAdmin = profile?.role === "super_admin";
-  const isPlatformAdmin = profile?.platform_admin === true;
-  const displayName = profile?.full_name || user.email;
-  const roleLabel = isPlatformAdmin
-    ? "Platform Admin"
-    : profile?.role
-      ? (ROLE_LABEL[profile.role] ?? profile.role)
-      : "Pending";
-
-  const { data: staff } = isManager
-    ? await supabase
-        .from("profiles")
-        .select("id, full_name, role, active")
-        .neq("role", "rep")
-        .order("full_name")
-    : { data: null };
-
-  const { data: reps } = isManager
-    ? await supabase
-        .from("profiles")
-        .select("id, full_name, active")
-        .eq("role", "rep")
-        .order("full_name")
-    : { data: null };
-
-  // Customer order links are a paid feature (0037), so the card only
-  // appears for a shop whose plan includes it. RLS refuses the insert
-  // either way -- this just keeps a button off the screen that would
-  // only ever explain why it can't be used.
-  const plan = profile?.company_id
-    ? await loadCompanyPlan(supabase, profile.company_id)
-    : null;
-  const canUseOrderLinks =
-    plan !== null && planAllows(plan, "customer_links");
-
-  // Their own customer order link, if they've made one already -- RLS
-  // scopes order_links to the caller's own row for a rep.
-  const { data: orderLink } = canUseOrderLinks
-    ? await supabase
-        .from("order_links")
-        .select("token")
-        .eq("rep_id", user.id)
-        .maybeSingle()
-    : { data: null };
-  const orderLinkToken = orderLink?.token ?? null;
-
-  // RLS already scopes this to "my orders" for a rep and "all orders" for
-  // a manager, same as the Order Board -- no extra filter needed here.
-  const { data: deadlineOrders } = await supabase
-    .from("orders")
-    .select("deadline, status")
-    .not("deadline", "is", null);
-  const activeDeadlines = (deadlineOrders ?? []).filter(
-    (o) => !["draft", "cancelled", "shipped"].includes(o.status),
-  );
-  const overdueCount = activeDeadlines.filter(
-    (o) => (daysUntil(o.deadline!) ?? 0) < 0,
-  ).length;
-  const dueSoonCount = activeDeadlines.filter((o) => {
-    const d = daysUntil(o.deadline!);
-    return d !== null && d >= 0 && d <= 7;
-  }).length;
-
-  // Orders submitted by anyone else since this manager last visited the
-  // Order Board (which stamps orders_viewed_at -- see app/orders/page.tsx).
-  // Reps don't get this: they already know what they just submitted.
-  let newOrderCount = 0;
-  if (isManager && profile?.orders_viewed_at) {
-    const { data: newOrders } = await supabase
-      .from("orders")
-      .select("id")
-      .neq("status", "draft")
-      .neq("rep_id", user.id)
-      .gt("created_at", profile.orders_viewed_at);
-    newOrderCount = newOrders?.length ?? 0;
-  }
-
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12">
-      <div className="w-full max-w-sm text-center">
-        <h1 className="font-script mb-8 text-4xl text-black">Order Desk</h1>
+    <div className="min-h-dvh bg-white">
+      {/* ---------- nav ---------- */}
+      <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5">
+        <span className="font-script text-2xl leading-none text-black">
+          Apparel Logic
+        </span>
+        <nav className="flex items-center gap-4 text-sm">
+          {user ? (
+            <Link href="/home" className="font-medium text-black underline">
+              Go to my shop
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="text-neutral-500 hover:text-black">
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-lg bg-black px-3.5 py-2 font-medium text-white"
+              >
+                Start free
+              </Link>
+            </>
+          )}
+        </nav>
+      </header>
 
-        <div className="rounded-xl border border-neutral-200 px-6 py-8">
-          <p className="text-sm text-neutral-500">Signed in as</p>
-          <p className="mt-1 text-xl font-medium text-black">{displayName}</p>
-          <span className="mt-3 inline-block rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-neutral-700">
-            {roleLabel}
-          </span>
+      {/* ---------- hero ---------- */}
+      <section className="mx-auto max-w-4xl px-5 pb-4 pt-8 sm:pt-14">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-400">
+          For team &amp; spirit-wear shops
+        </p>
+        <h1 className="mt-3 max-w-3xl text-4xl font-bold leading-[1.05] tracking-tight text-black sm:text-6xl">
+          Team apparel orders,
+          <br />
+          off the group chat.
+        </h1>
+        <p className="mt-5 max-w-xl text-lg leading-relaxed text-neutral-600">
+          A coach sends 24 names and numbers in a text. Somewhere in that
+          thread is the deadline, the sizes, and half a Venmo screenshot.
+          Apparel Logic is where that order actually lives.
+        </p>
+
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <Link
+            href="/signup"
+            className="rounded-lg bg-black px-6 py-3.5 text-base font-medium text-white"
+          >
+            Start {TRIAL_DAYS} days free
+          </Link>
+          <span className="text-sm text-neutral-500">No card needed.</span>
         </div>
+      </section>
 
-        {newOrderCount > 0 && (
-          <Link
-            href="/orders"
-            className="mt-4 block rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm font-semibold text-blue-800"
-          >
-            {newOrderCount} new order{newOrderCount === 1 ? "" : "s"} submitted
-            since you last checked
-          </Link>
-        )}
+      {/* ---------- the specific problem ---------- */}
+      <section className="mx-auto max-w-4xl px-5 py-14">
+        <h2 className="text-2xl font-bold tracking-tight text-black sm:text-3xl">
+          Built for rosters, not print jobs
+        </h2>
+        <p className="mt-3 max-w-xl text-neutral-600">
+          Most shop software is built for a production floor. Team apparel is
+          a different job, and these are the parts nobody else gets right.
+        </p>
 
-        {(overdueCount > 0 || dueSoonCount > 0) && (
-          <Link
-            href="/orders"
-            className="mt-4 block rounded-lg border px-4 py-3 text-left text-sm font-semibold"
-            style={{
-              borderColor: overdueCount > 0 ? "#FCA5A5" : "#FDE68A",
-              background: overdueCount > 0 ? "#FEF2F2" : "#FFFBEB",
-              color: overdueCount > 0 ? "#B42318" : "#B45309",
-            }}
-          >
-            {overdueCount > 0 &&
-              `${overdueCount} order${overdueCount === 1 ? "" : "s"} overdue`}
-            {overdueCount > 0 && dueSoonCount > 0 && " · "}
-            {dueSoonCount > 0 &&
-              `${dueSoonCount} due within 7 days`}
-          </Link>
-        )}
-
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <Link
-            href="/orders/new"
-            className="rounded-lg bg-black px-4 py-3 text-center text-sm font-medium text-white"
-          >
-            New Order
-          </Link>
-          <Link
-            href="/orders"
-            className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-          >
-            {isManager ? "All Orders" : "My Orders"}
-          </Link>
+        <div className="mt-8 grid gap-x-10 gap-y-8 sm:grid-cols-2">
+          {[
+            {
+              title: "Paste the whole roster",
+              body: "A coach's list goes in as one paste — names, numbers and sizes, in whatever format it arrived in. Save it and it prefills next season.",
+            },
+            {
+              title: "Size runs the vendor can read",
+              body: "Every order produces the tally sheet and a manufacturer-ready build order. That's the spreadsheet your team currently rebuilds by hand.",
+            },
+            {
+              title: "Hats that add up to a minimum",
+              body: "Three teams each ordered four of the same cap. The screen tells you they make one full vendor order instead of three short ones.",
+            },
+            {
+              title: "The customer fills it out",
+              body: "Send one link. They pick from your real price list, with your terms and turnaround on the page. It lands in your queue under your rep's name.",
+            },
+            {
+              title: "They approve the design themselves",
+              body: "The coach sees the mockup on their phone and approves it, or says exactly what to change. No screenshot, no text thread.",
+            },
+            {
+              title: "Profit per order, not just revenue",
+              body: "Vendor cost per line, shipping, supplies. Most shops genuinely don't know which orders made money. This one does.",
+            },
+          ].map((item) => (
+            <div key={item.title}>
+              <h3 className="text-base font-bold text-black">{item.title}</h3>
+              <p className="mt-1.5 text-[15px] leading-relaxed text-neutral-600">
+                {item.body}
+              </p>
+            </div>
+          ))}
         </div>
+      </section>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <Link
-            href="/activity"
-            className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-          >
-            Activity
-          </Link>
+      {/* ---------- pricing ---------- */}
+      <section className="border-t border-neutral-200 bg-neutral-50">
+        <div className="mx-auto max-w-4xl px-5 py-14">
+          <h2 className="text-2xl font-bold tracking-tight text-black sm:text-3xl">
+            Pricing
+          </h2>
+          <p className="mt-3 text-neutral-600">
+            Every plan includes orders, pricing, customers, tracking links and
+            receipts. Yearly is two months free.
+          </p>
 
-          {isManager && (
-            <Link
-              href="/pricing"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Pricing
-            </Link>
-          )}
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {TIERS.map((tier) => {
+              const plan = PLANS[tier];
+              const highlight = tier === "pro";
+              return (
+                <div
+                  key={tier}
+                  className={`flex flex-col rounded-xl bg-white p-5 ${
+                    highlight
+                      ? "border-2 border-black"
+                      : "border border-neutral-200"
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-base font-bold text-black">
+                      {plan.name}
+                    </span>
+                    {highlight && (
+                      <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        Most shops
+                      </span>
+                    )}
+                  </div>
 
-          {isManager && (
-            <Link
-              href="/vendors"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Vendors
-            </Link>
-          )}
+                  <div className="mt-3 font-mono text-3xl font-bold text-black">
+                    ${plan.monthly}
+                    <span className="font-sans text-sm font-normal text-neutral-400">
+                      /mo
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-neutral-500">
+                    or ${plan.yearly.toLocaleString()}/year
+                  </div>
 
-          {isManager && (
-            <Link
-              href="/customers"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Customers
-            </Link>
-          )}
+                  <p className="mt-3 text-sm leading-relaxed text-neutral-600">
+                    {plan.pitch}
+                  </p>
 
-          {isManager && (
-            <Link
-              href="/reports"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Reports
-            </Link>
-          )}
-
-          {isManager && (
-            <Link
-              href="/hats"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Hat Orders
-            </Link>
-          )}
-
-          {isManager && (
-            <Link
-              href="/shop-info"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Shop Info
-            </Link>
-          )}
-
-          {isSuperAdmin && (
-            <Link
-              href="/billing"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Plan &amp; Billing
-            </Link>
-          )}
-
-          {isSuperAdmin && (
-            <Link
-              href="/company"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Company
-            </Link>
-          )}
-
-          {isPlatformAdmin && (
-            <Link
-              href="/issues"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Issues
-            </Link>
-          )}
-
-          {isPlatformAdmin && (
-            <Link
-              href="/admin/companies"
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-center text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Companies
-            </Link>
-          )}
-        </div>
-
-        {canUseOrderLinks && <OrderLinkCard initialToken={orderLinkToken} />}
-
-        <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
-          <PinForm />
-        </div>
-
-        {isManager && (
-          <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
-            <AddRepForm />
-
-            {reps && reps.length > 0 && (
-              <div className="mt-6 border-t border-neutral-200 pt-4">
-                <p className="mb-2 text-sm font-medium text-black">Reps</p>
-                <ul>
-                  {reps.map((rep) => (
-                    <StaffRow
-                      key={rep.id}
-                      id={rep.id}
-                      fullName={rep.full_name}
-                      active={rep.active}
-                      roleLabel="Rep"
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
+                  <div className="mt-4 border-t border-neutral-200 pt-3 text-sm text-neutral-600">
+                    {plan.seats === null
+                      ? "Unlimited staff"
+                      : `Up to ${plan.seats} staff`}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
 
-        {isSuperAdmin && (
-          <div className="mt-6 rounded-xl border border-neutral-200 px-6 py-6 text-left">
-            <AddManagerForm />
-
-            {staff && staff.length > 0 && (
-              <div className="mt-6 border-t border-neutral-200 pt-4">
-                <p className="mb-2 text-sm font-medium text-black">
-                  Managers &amp; admins
-                </p>
-                <ul>
-                  {staff.map((person) => (
-                    <StaffRow
-                      key={person.id}
-                      id={person.id}
-                      fullName={person.full_name}
-                      active={person.active}
-                      roleLabel={ROLE_LABEL[person.role] ?? person.role}
-                      locked={person.role === "super_admin"}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
+          <div className="mt-8">
+            <Link
+              href="/signup"
+              className="inline-block rounded-lg bg-black px-6 py-3.5 text-base font-medium text-white"
+            >
+              Start {TRIAL_DAYS} days free
+            </Link>
           </div>
-        )}
+        </div>
+      </section>
 
-        <form action={signOut} className="mt-6">
-          <button
-            type="submit"
-            className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-sm font-medium text-black transition-colors hover:bg-neutral-50"
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
-    </main>
+      {/* ---------- footer ---------- */}
+      <footer className="mx-auto max-w-4xl px-5 py-10">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-200 pt-6 text-sm">
+          <span className="font-script text-lg text-black">Apparel Logic</span>
+          <div className="flex gap-5 text-neutral-500">
+            <Link href="/login" className="hover:text-black">
+              Sign in
+            </Link>
+            <Link href="/signup" className="hover:text-black">
+              Start free
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

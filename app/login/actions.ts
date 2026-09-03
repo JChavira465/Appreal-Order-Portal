@@ -131,5 +131,5 @@ export async function signIn(
   // user (RLS only lets a user log their own login).
   await supabase.from("login_events").insert({ profile_id: userId });
 
-  redirect("/");
+  redirect("/home");
 }

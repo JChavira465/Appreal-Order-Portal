@@ -64,7 +64,7 @@ export default async function NewOrderPage({
 
   return (
     <main className="mx-auto max-w-lg px-5 py-6">
-      <Link href="/" className="text-xs text-neutral-400 underline">
+      <Link href="/home" className="text-xs text-neutral-400 underline">
         ← Home
       </Link>
       {initial && (

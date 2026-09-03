@@ -24,7 +24,7 @@ export function ConfigError({ missing }: { missing: string[] }) {
     <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12">
       <div className="w-full max-w-sm">
         <h1 className="font-script mb-4 text-center text-4xl text-black">
-          Order Desk
+          Apparel Logic
         </h1>
         <div className="rounded-xl border border-red-200 bg-red-50 p-5">
           <p className="text-sm font-bold text-red-800">

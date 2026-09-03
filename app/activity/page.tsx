@@ -67,7 +67,7 @@ export default async function ActivityPage() {
 
   return (
     <main className="mx-auto max-w-lg px-5 py-6">
-      <Link href="/" className="text-xs text-neutral-400 underline">
+      <Link href="/home" className="text-xs text-neutral-400 underline">
         ← Home
       </Link>
       <h1 className="mb-1 mt-3 text-lg font-bold text-black">Activity</h1>

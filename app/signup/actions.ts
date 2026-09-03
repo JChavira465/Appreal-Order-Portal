@@ -138,7 +138,7 @@ export async function signUpCompany(
   // -- it carries the slug, and without it /login has nothing to show.
   await sendEmail({
     to: email,
-    subject: `${companyName} is set up on Order Desk`,
+    subject: `${companyName} is set up on Apparel Logic`,
     body:
       `Your shop is ready, ${ownerName}.\n\n` +
       `Sign in with your name and the 4-digit PIN you just chose. Save this link — it's how you and your team get back in.\n\n` +

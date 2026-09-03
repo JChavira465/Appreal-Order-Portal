@@ -1,4 +1,4 @@
-# Apparel Order Portal
+# Apparel Logic
 
 Order-management platform for custom sports-apparel shops: reps take team
 orders on their phone, managers move them through mockup → production →
@@ -286,6 +286,32 @@ supabase/migrations/           see below
 ```
 
 ## Changelog
+
+### September 3, 2026 — Apparel Logic, and a front door
+
+Renamed from "Order Desk", which turned out to be an existing ecommerce
+SaaS (orderdesk.com) — same industry, and theirs in Google's index.
+Caught before a domain was bought, staff bookmarked sign-in links, or it
+went on an invoice. Renaming later would have cost every saved link a
+shop had plus a trademark letter nobody wants.
+
+**`/` is now a public landing page** and the signed-in dashboard moved to
+`/home`. Until now the front door was a login screen, so a shop owner who
+got pitched on Tuesday and looked the company up on Thursday saw
+somebody's internal tool rather than a product worth buying. One page:
+what it is, who it's for, the six things nobody else does properly, and
+the price list.
+
+Kept as one domain and one deploy rather than a separate marketing site.
+For a solo founder every extra moving part is something that breaks at
+1am, and Next.js serves a static landing page from the same project at no
+extra cost.
+
+One trap worth recording: `/` could not simply be added to the
+middleware's `PUBLIC_PATHS`, which is matched with `startsWith()` — every
+path on the site starts with `/`, so that one line would have made the
+whole application public. It lives in a separate exact-match list, named
+so nobody appends to the wrong array later.
 
 ### September 3, 2026 — Getting paid
 

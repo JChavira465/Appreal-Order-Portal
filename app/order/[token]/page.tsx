@@ -60,7 +60,7 @@ export default async function CustomerOrderPage({
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
         <div className="w-full max-w-sm">
-          <h1 className="font-script mb-3 text-4xl text-black">Order Desk</h1>
+          <h1 className="font-script mb-3 text-4xl text-black">Apparel Logic</h1>
           <p className="text-sm text-neutral-500">
             This order link isn&apos;t active anymore. Ask whoever sent it to
             you for a new one.

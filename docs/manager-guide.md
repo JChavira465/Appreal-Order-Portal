@@ -1,4 +1,4 @@
-# Order Desk — Manager & Super Admin Guide
+# Apparel Logic — Manager & Super Admin Guide
 
 _Last updated: September 3, 2026_
 

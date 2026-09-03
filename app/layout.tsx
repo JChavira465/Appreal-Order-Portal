@@ -17,7 +17,7 @@ const kaushanScript = Kaushan_Script({
 });
 
 export const metadata: Metadata = {
-  title: "Order Desk",
+  title: "Apparel Logic",
   description: "Order-management platform for apparel shops.",
 };
 
