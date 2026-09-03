@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signedUrlsFor } from "@/lib/order-images";
 import { loadShopInfo } from "@/lib/shopInfo";
+import { loadPayoutAccounts, paymentReference } from "@/lib/payouts";
+import { PayPanel } from "@/app/PayPanel";
 import { ShopInfoBlock } from "@/app/ShopInfoBlock";
 import { CARRIER_LABELS, isCarrier, trackingUrl, type Carrier } from "@/lib/tracking";
 import { MockupActions } from "./MockupActions";
@@ -50,7 +52,10 @@ export default async function TrackPage({
   const { data: order } = await admin
     .from("orders")
     .select(
-      `company_id, team_name, status, revision_requested, deadline, mockup_notes,
+      `company_id, order_number, team_name, status, revision_requested, deadline,
+       mockup_notes, shipping_fee, discount,
+       order_items(line_total),
+       payments(amount),
        order_tracking_numbers(id, carrier, tracking_number),
        order_images(id, storage_path, kind)`,
     )
@@ -72,6 +77,30 @@ export default async function TrackPage({
   // visitor has no session. Safe to expose: these are the same terms the
   // shop prints on its own price sheet, written to be read by customers.
   const shopInfo = await loadShopInfo(admin, order.company_id as string);
+
+  // What they owe, and where to send it. Read with the admin client like
+  // everything else here -- the person paying has no account.
+  //
+  // This is the one thing on this page that isn't purely status: the
+  // balance is a number about money. It's shown because a customer
+  // cannot pay a balance they can't see, and it's the total THEY agreed
+  // to -- never cost, vendor or profit, which stay off this page as
+  // firmly as ever.
+  const payoutAccounts = await loadPayoutAccounts(
+    admin,
+    order.company_id as string,
+  );
+
+  const lineTotals = (order.order_items ?? []) as { line_total: number | null }[];
+  const paidSoFar = ((order.payments ?? []) as { amount: number | null }[]).reduce(
+    (sum, p) => sum + Number(p.amount ?? 0),
+    0,
+  );
+  const orderTotal =
+    lineTotals.reduce((sum, li) => sum + Number(li.line_total ?? 0), 0) +
+    Number(order.shipping_fee ?? 0) -
+    Number(order.discount ?? 0);
+  const balanceDue = orderTotal - paidSoFar;
 
   const trackingEntries = (order.order_tracking_numbers ?? []) as TrackingRow[];
   const mockupImages = ((order.order_images ?? []) as ImageRow[]).filter(
@@ -192,6 +221,21 @@ export default async function TrackPage({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {!isCancelled && !isDraft && balanceDue > 0 && (
+        <PayPanel
+          accounts={payoutAccounts}
+          amount={balanceDue}
+          reference={paymentReference(order.order_number, order.team_name)}
+          audience="customer"
+        />
+      )}
+
+      {!isCancelled && !isDraft && orderTotal > 0 && balanceDue <= 0 && (
+        <div className="mt-5 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center text-sm font-semibold text-green-800">
+          Paid in full — thank you.
         </div>
       )}
 

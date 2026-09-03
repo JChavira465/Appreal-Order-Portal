@@ -3,6 +3,8 @@ import { requireManagerContext } from "@/lib/adminAssist";
 import { hasShopInfo, loadShopInfo } from "@/lib/shopInfo";
 import { ShopInfoBlock } from "../ShopInfoBlock";
 import { ShopInfoForm } from "./ShopInfoForm";
+import { PayoutAccounts } from "./PayoutAccounts";
+import { loadPayoutAccounts } from "@/lib/payouts";
 
 export default async function ShopInfoPage({
   searchParams,
@@ -27,9 +29,10 @@ export default async function ShopInfoPage({
 
   const { supabase, companyId, isAssisting } = ctx;
 
-  const [{ data: company }, info] = await Promise.all([
+  const [{ data: company }, info, payoutAccounts] = await Promise.all([
     supabase.from("companies").select("name").eq("id", companyId).single(),
     loadShopInfo(supabase, companyId),
+    loadPayoutAccounts(supabase, companyId),
   ]);
 
   return (
@@ -53,6 +56,17 @@ export default async function ShopInfoPage({
 
       <div className="rounded-xl border border-neutral-200 p-4">
         <ShopInfoForm info={info} asCompany={asCompany ?? null} />
+      </div>
+
+      <div className="mt-8 rounded-xl border border-neutral-200 p-4">
+        <h2 className="text-sm font-bold text-black">How you get paid</h2>
+        <p className="mb-4 mt-0.5 text-xs text-neutral-500">
+          Add the apps you already collect on. These appear on every order
+          with a balance — for your reps, and for customers on their own
+          tracking page — with the amount and a reference filled in, so you
+          stop getting payments you can&apos;t match to an order.
+        </p>
+        <PayoutAccounts accounts={payoutAccounts} asCompany={asCompany ?? null} />
       </div>
 
       <div className="mt-8">

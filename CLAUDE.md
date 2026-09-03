@@ -69,7 +69,7 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 3** (guides last regenerated
+- **Changes since last guide update: 4** (guides last regenerated
   September 3, 2026)
 
 ## Scheduled routines (standing instructions from the user)
@@ -131,7 +131,8 @@ select
   exists (select 1 from information_schema.columns
            where table_name = 'orders' and column_name = 'revision_note') as has_0040,
   exists (select 1 from information_schema.columns
-           where table_name = 'profiles' and column_name = 'signup_email') as has_0041;
+           where table_name = 'profiles' and column_name = 'signup_email') as has_0041,
+  to_regclass('public.payout_accounts')   is not null as has_0042;
 ```
 
 ## Things that have bitten us before

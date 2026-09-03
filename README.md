@@ -210,6 +210,7 @@ lib/
   stripe.ts                    Stripe client + tier<->price mapping, inert without keys
   email.ts                     Resend wrapper; a no-op that logs when unconfigured
   notify.ts                    the four moments worth emailing about
+  payouts.ts                   payment handles, deep links and the order reference
   like.ts                      escapes SQL LIKE wildcards before an ilike match
 supabase/migrations/           see below
 ```
@@ -280,9 +281,52 @@ supabase/migrations/           see below
                                  instead of a boolean that said only that someone was unhappy
 0041_self_serve_signup.sql    profiles.signup_email + unique index, so a shop can sign itself
                                  up without the platform admin creating it by hand
+0042_payout_accounts.sql      payout_accounts (Venmo / Cash App / Apple Cash / Zelle),
+                                 replacing venmo_collectors; migrates existing handles across
 ```
 
 ## Changelog
+
+### September 3, 2026 — Getting paid
+
+Shops collected on Venmo only, through a table with no screen to edit it.
+A coach who uses Cash App was not going to install Venmo to pay for
+jerseys, and payments arrived with references like "jerseys" that nobody
+could match to an order.
+
+**Owners now add their own handles** under Shop Info — Venmo, Cash App,
+Apple Cash and Zelle — and they appear automatically on every order with
+a balance, in two places: the rep's order screen, and the **customer's own
+tracking page**, where they can pay without an account or a phone call.
+
+Every payment carries a reference of `#1042 Wildcats` — order number
+first because that's what a shop searches by, team name because that's
+what they recognise.
+
+The four apps are deliberately not treated as one thing, because they
+aren't:
+
+- **Venmo** takes a real deep link: recipient, amount *and* the reference
+  all pre-fill, so the note lands on the payment itself.
+- **Cash App** pre-fills the amount but has no note parameter, so the
+  screen says to add the reference and offers a copy button.
+- **Apple Cash and Zelle** have no link at all — Apple Cash goes through
+  Messages, Zelle through the payer's own bank. Both show the details with
+  instructions rather than a button that would pretend to work.
+
+Writing a handle is manager-and-up. A rep quietly redirecting payments to
+their own Venmo is precisely what that restriction is for.
+
+The customer tracking page now shows a balance, which is a change to what
+that page reveals: it was previously status-only. It shows the total the
+customer already agreed to and nothing else — cost, vendor and profit
+stay off it as firmly as ever — because a customer cannot pay a balance
+they can't see.
+
+**This is not payment processing.** Nothing moves money or confirms
+anything; somebody still checks the app and records the payment, exactly
+as today. What changes is that the customer stops asking where to send it,
+and the shop stops guessing what an incoming $340 was for.
 
 ### September 3, 2026 — Notifications, self-serve signup, revision notes
 

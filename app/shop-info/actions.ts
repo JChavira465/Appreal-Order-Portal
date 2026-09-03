@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireManagerContext } from "@/lib/adminAssist";
+import { isPayoutProvider, normalizeHandle } from "@/lib/payouts";
 
 export type ShopInfoResult = { ok: boolean; message: string } | null;
 
@@ -74,4 +75,77 @@ export async function saveShopInfo(
 
   revalidatePath(asCompany ? `/shop-info?company=${asCompany}` : "/shop-info");
   return { ok: true, message: "Saved — customers will see this on their order." };
+}
+
+export type PayoutResult = { ok: boolean; message: string } | null;
+
+export async function addPayoutAccount(
+  _prevState: PayoutResult,
+  formData: FormData,
+): Promise<PayoutResult> {
+  const asCompany = String(formData.get("asCompany") ?? "") || null;
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can change this." };
+  const { supabase, companyId } = ctx;
+
+  const providerRaw = String(formData.get("provider") ?? "");
+  if (!isPayoutProvider(providerRaw)) {
+    return { ok: false, message: "Pick a payment app." };
+  }
+
+  const handle = normalizeHandle(providerRaw, String(formData.get("handle") ?? ""));
+  if (!handle) {
+    return { ok: false, message: "Enter the username or number to pay." };
+  }
+
+  const label = String(formData.get("label") ?? "").trim().slice(0, 60);
+
+  const { data: existing } = await supabase
+    .from("payout_accounts")
+    .select("sort_order")
+    .eq("company_id", companyId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("payout_accounts").insert({
+    company_id: companyId,
+    provider: providerRaw,
+    handle,
+    label: label || null,
+    sort_order: (existing?.sort_order ?? 0) + 10,
+  });
+
+  if (error) {
+    console.error("addPayoutAccount: insert failed", error);
+    return { ok: false, message: `Could not add it: ${error.message}` };
+  }
+
+  revalidatePath(asCompany ? `/shop-info?company=${asCompany}` : "/shop-info");
+  return { ok: true, message: "Added — customers will see it on their order." };
+}
+
+export async function removePayoutAccount(
+  id: string,
+  asCompany: string | null,
+): Promise<PayoutResult> {
+  const ctx = await requireManagerContext(asCompany);
+  if (!ctx) return { ok: false, message: "Only a manager can change this." };
+  const { supabase, companyId } = ctx;
+
+  // Scoped by company as well as id: the platform admin bypasses RLS, so
+  // without this an id from one shop could delete a row in another.
+  const { error } = await supabase
+    .from("payout_accounts")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", companyId);
+
+  if (error) {
+    console.error("removePayoutAccount: delete failed", error);
+    return { ok: false, message: `Could not remove it: ${error.message}` };
+  }
+
+  revalidatePath(asCompany ? `/shop-info?company=${asCompany}` : "/shop-info");
+  return { ok: true, message: "Removed." };
 }

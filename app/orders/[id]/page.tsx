@@ -17,8 +17,8 @@ import {
 } from "./StatusActions";
 import { LineCostForm, OrderCostForm } from "./CostSection";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/payment-methods";
-import { VenmoPayLink } from "./VenmoPayLink";
-import { loadVenmoCollectors } from "@/lib/venmo";
+import { PayPanel } from "@/app/PayPanel";
+import { loadPayoutAccounts, paymentReference } from "@/lib/payouts";
 import { AiConceptForm } from "./AiConceptSection";
 import { DeleteImageButton } from "./DeleteImageButton";
 import { BuildOrderExport } from "./BuildOrderExport";
@@ -328,7 +328,7 @@ export default async function OrderDetailPage({
     ? await supabase.from("companies").select("name").eq("id", companyId).single()
     : { data: null };
 
-  const [{ data: order }, catalog, venmoCollectors] = await Promise.all([
+  const [{ data: order }, catalog, payoutAccounts] = await Promise.all([
     supabase
       .from("orders")
       .select(
@@ -348,7 +348,7 @@ export default async function OrderDetailPage({
       .eq("company_id", companyId)
       .maybeSingle(),
     loadCatalog(supabase, companyId),
-    loadVenmoCollectors(supabase, companyId),
+    loadPayoutAccounts(supabase, companyId),
   ]);
 
   if (!order) {
@@ -767,19 +767,12 @@ export default async function OrderDetailPage({
           </span>
         </div>
         {balanceDue > 0 && !cancelled && (
-          <div className="mb-1">
-            <p className="mb-2 text-xs text-neutral-400">
-              Pick whichever collector this payment should go to:
-            </p>
-            {venmoCollectors.map((collector) => (
-              <VenmoPayLink
-                key={collector.name}
-                collector={collector}
-                amount={balanceDue}
-                note={`${order.team_name} - ${fmtDate(order.created_at)}`}
-              />
-            ))}
-          </div>
+          <PayPanel
+            accounts={payoutAccounts}
+            amount={balanceDue}
+            reference={paymentReference(order.order_number, order.team_name)}
+            audience="rep"
+          />
         )}
         {payments.length > 0 && (
           <div className="mb-3 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
