@@ -15,6 +15,15 @@ import { TierSelect } from "../TierSelect";
 import { FeatureToggle } from "./FeatureToggle";
 import { TrialDate } from "./TrialDate";
 
+// toISOString() throws a RangeError on an invalid date, which on a
+// server component takes the entire page down rather than degrading.
+// Never worth risking for a form default.
+function toDateInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -185,11 +194,7 @@ export default async function CompanyDetailPage({
         {company.billing_status === "trialing" && (
           <TrialDate
             companyId={company.id}
-            value={
-              company.trial_ends_at
-                ? new Date(company.trial_ends_at).toISOString().slice(0, 10)
-                : ""
-            }
+            value={toDateInput(company.trial_ends_at)}
             expired={trialExpired}
           />
         )}

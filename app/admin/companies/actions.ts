@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pinToPassword } from "@/lib/pin";
-import { FEATURES, isFeature, isTier, type Feature } from "@/lib/plans";
+import { isFeature, isTier } from "@/lib/plans";
 
 export type CreateCompanyResult = { ok: boolean; message: string } | null;
 
@@ -311,8 +311,6 @@ export async function setCompanyFeature(
   };
 }
 
-export type { Feature };
-export { FEATURES };
 
 export type SetTrialResult = { ok: boolean; message: string };
 

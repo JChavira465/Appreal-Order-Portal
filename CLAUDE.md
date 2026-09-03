@@ -124,6 +124,12 @@ select
 
 ## Things that have bitten us before
 
+- A `"use server"` file may only export **async functions**. Re-exporting
+  a constant or an array from one (`export { FEATURES }`) compiles and
+  passes `npm run build` clean, then throws a server-side exception at
+  runtime on every page that imports it. Types are fine (they erase);
+  values are not. Keep shared constants in `lib/`.
+
 - Vercel Edge Middleware has a hard 25s execution limit that can't be
   raised — any slow operation there needs to race against a shorter
   internal timeout and fail closed (see `lib/supabase/middleware.ts`).
