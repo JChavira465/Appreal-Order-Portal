@@ -76,6 +76,48 @@ export default async function HomePage() {
       );
     }
 
+    // A canceled subscription closes every door through billing_status
+    // alone -- the webhook no longer touches companies.active, so this
+    // never reaches the "suspended" branch above and would otherwise
+    // land on a home page whose every query silently returns nothing.
+    if (company && company.billing_status === "canceled") {
+      const isOwner = profile?.role === "super_admin";
+      return (
+        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
+          <div className="w-full max-w-sm">
+            <h1 className="mb-4 text-lg font-bold text-black">
+              Your subscription has ended
+            </h1>
+            <p className="text-sm text-neutral-500">
+              {company.name}&apos;s plan was cancelled. Your orders and
+              everything else are safe — start a plan again and it all comes
+              straight back.
+            </p>
+            {isOwner ? (
+              <Link
+                href="/billing"
+                className="mt-6 block rounded-lg bg-black px-4 py-3 text-sm font-medium text-white"
+              >
+                See plans
+              </Link>
+            ) : (
+              <p className="mt-6 text-xs text-neutral-500">
+                Ask the account owner to start a plan again.
+              </p>
+            )}
+            <form action={signOut} className="mt-8">
+              <button
+                type="submit"
+                className="text-xs text-neutral-400 underline"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </main>
+      );
+    }
+
     // An expired trial closes the same doors suspension does (0039), so
     // without this the shop would land on a home page whose every query
     // silently returns nothing. Deliberately a different screen from

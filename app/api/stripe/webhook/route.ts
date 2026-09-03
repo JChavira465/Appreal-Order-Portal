@@ -54,15 +54,25 @@ async function applySubscription(subscription: Stripe.Subscription) {
 
   const status = mapStatus(subscription.status);
 
-  // Cancellation reuses the suspension lever from 0032 rather than
-  // inventing a second way to lock a company out: active = false makes
-  // current_company_id() return null, which closes every table at once
-  // and shows the shop the "account suspended" screen. Any non-canceled
-  // status reopens it, so a recovered payment restores access with no
-  // manual step.
+  // Deliberately does NOT touch companies.active.
+  //
+  // An earlier version set `active: status !== "canceled"`, reusing the
+  // suspension lever for cancellation. That quietly broke the lever: a
+  // company suspended by hand for unsettled debt still has a live
+  // subscription, so its next routine renewal event -- which Stripe
+  // sends every billing period without anyone doing anything -- flipped
+  // active back to true and un-suspended them. The one control for
+  // "this shop hasn't paid me what they owe" undid itself on a monthly
+  // timer.
+  //
+  // It was never needed anyway. company_is_entitled() (0039) requires a
+  // billing_status of active/past_due/unexpired-trialing, so setting
+  // billing_status = 'canceled' already closes every door on its own.
+  // Keeping the two separate means `active` is only ever the platform
+  // admin's manual lever and `billing_status` is only ever what Stripe
+  // reports, and neither can silently overwrite the other.
   const patch: Record<string, unknown> = {
     billing_status: status,
-    active: status !== "canceled",
     stripe_subscription_id: subscription.id,
     current_period_end: item?.current_period_end
       ? new Date(item.current_period_end * 1000).toISOString()
