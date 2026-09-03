@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadCompanyPlan } from "@/lib/companyPlan";
-import { stripeConfigured, priceIdFor } from "@/lib/stripe";
+import { stripeConfigured, priceIdFor, siteUrl } from "@/lib/stripe";
 import { BILLING_STATUS_COPY, PLANS, TIERS } from "@/lib/plans";
 import { PlanPicker } from "./PlanPicker";
 
@@ -90,8 +90,15 @@ export default async function BillingPage() {
   // Checkout only works once the platform admin has both a Stripe key
   // and a price for every tier -- a half-configured setup that renders
   // buttons which fail on click is worse than buttons that say why.
+  // siteUrl() belongs in this check as much as the keys and prices do:
+  // Checkout can't be created without somewhere to send the customer
+  // back to, so leaving it out meant the buttons rendered enabled and
+  // then failed on click with a message the person clicking can do
+  // nothing about. A control that looks ready and isn't is worse than
+  // one that's plainly switched off.
   const checkoutEnabled =
     stripeConfigured() &&
+    Boolean(siteUrl()) &&
     TIERS.every(
       (t) => priceIdFor(t, "monthly") && priceIdFor(t, "yearly"),
     );
