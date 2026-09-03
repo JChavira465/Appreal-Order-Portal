@@ -65,6 +65,12 @@ export function CreateCompanyForm() {
           placeholder="1234"
           className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-black placeholder:text-neutral-400 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
         />
+      <input
+        name="ownerEmail"
+        type="email"
+        placeholder="Owner's email (optional — for notifications)"
+        className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-black placeholder:text-neutral-400 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+      />
       </div>
 
       {state && (

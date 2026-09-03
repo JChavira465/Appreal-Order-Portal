@@ -51,6 +51,7 @@ export async function createCompany(
   const slugInput = String(formData.get("slug") ?? "").trim();
   const ownerName = String(formData.get("ownerName") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
+  const ownerEmail = String(formData.get("ownerEmail") ?? "").trim().toLowerCase();
 
   if (!companyName) {
     return { ok: false, message: "Enter a company name." };
@@ -111,6 +112,8 @@ export async function createCompany(
       full_name: ownerName,
       role: "super_admin",
       company_id: company.id,
+      // Their notification address. They still sign in with a PIN.
+      signup_email: ownerEmail || null,
     })
     .eq("id", created.user.id);
 

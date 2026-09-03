@@ -31,6 +31,12 @@ export function AddManagerForm() {
         placeholder="Initial 4-digit PIN"
         className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-black placeholder:text-neutral-400 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
       />
+      <input
+        name="email"
+        type="email"
+        placeholder="Email (optional — for order notifications)"
+        className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-black placeholder:text-neutral-400 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+      />
       {state && (
         <p className={`text-sm ${state.ok ? "text-green-700" : "text-red-600"}`}>
           {state.message}

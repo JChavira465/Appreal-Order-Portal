@@ -53,6 +53,11 @@ async function createStaffAccount(
   pin: string,
   role: "rep" | "manager",
   companyId: string | null,
+  // Optional. Staff sign in with a PIN, so this is never needed to get
+  // into the app -- it exists only so the person can be notified when a
+  // mockup is ready or an order lands. Without it they simply get no
+  // email, which is exactly how the app behaved before notifications.
+  contactEmail: string,
 ): Promise<AddStaffResult> {
   if (!fullName) {
     return { ok: false, message: "Enter a name." };
@@ -115,11 +120,22 @@ async function createStaffAccount(
     .update({
       full_name: fullName,
       company_id: companyId,
+      signup_email: contactEmail || null,
       ...(role === "manager" ? { role: "manager" } : {}),
     })
     .eq("id", created.user.id);
 
   if (updateError) {
+    // signup_email carries a unique index (0041), so reusing an address
+    // that already belongs to another account fails here rather than
+    // silently pointing two people's notifications at one inbox.
+    if (updateError.code === "23505") {
+      await admin.auth.admin.deleteUser(created.user.id);
+      return {
+        ok: false,
+        message: "Another account already uses that email. Leave it blank or use a different one.",
+      };
+    }
     return {
       ok: false,
       message: "Account created but setup was incomplete. Try again.",
@@ -141,7 +157,8 @@ export async function addRep(
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
-  return createStaffAccount(fullName, pin, "rep", companyId);
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  return createStaffAccount(fullName, pin, "rep", companyId, email);
 }
 
 export async function addManager(
@@ -155,7 +172,8 @@ export async function addManager(
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
-  return createStaffAccount(fullName, pin, "manager", companyId);
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  return createStaffAccount(fullName, pin, "manager", companyId, email);
 }
 
 export type UpdateStaffResult = { ok: boolean; message: string } | null;
