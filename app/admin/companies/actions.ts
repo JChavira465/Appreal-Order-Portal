@@ -246,7 +246,11 @@ export async function setCompanyTier(
     return { ok: false, message: "Could not change the plan." };
   }
 
+  // Both paths: the tier control lives on the detail page now, but the
+  // list shows the plan name too, and revalidating a parent route does
+  // not cover its dynamic children.
   revalidatePath("/admin/companies");
+  revalidatePath(`/admin/companies/${companyId}`);
   return { ok: true, message: "Plan updated." };
 }
 
