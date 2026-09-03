@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { uploadOrderImage } from "@/lib/order-images";
 import { escapeLike } from "@/lib/like";
+import { notifyNewOrder } from "@/lib/notify";
 
 export type CreateOrderResult = { ok: boolean; message: string } | null;
 
@@ -242,6 +243,28 @@ export async function createOrder(
     actor_name: profile?.full_name ?? user.email,
     text: intent === "draft" ? "saved as draft" : "submitted order",
   });
+
+  // Drafts are private and unfinished, so only a real submission is
+  // worth interrupting a manager for. Sent before the redirect because
+  // redirect() throws to unwind -- anything after it never runs.
+  if (intent === "submit") {
+    const { data: submitted } = await supabase
+      .from("orders")
+      .select("company_id")
+      .eq("id", order.id)
+      .maybeSingle();
+
+    if (submitted?.company_id) {
+      await notifyNewOrder({
+        companyId: submitted.company_id as string,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        teamName,
+        submittedBy: profile?.full_name ?? "A rep",
+        fromCustomerLink: false,
+      });
+    }
+  }
 
   redirect(
     intent === "draft"

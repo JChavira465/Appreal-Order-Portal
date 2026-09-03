@@ -23,6 +23,9 @@ const PUBLIC_PATHS = [
   "/track/",
   "/order/",
   "/api/stripe/webhook",
+  // Public sign-up: whoever is here does not have an account yet, which
+  // is the entire point.
+  "/signup",
 ];
 
 // Vercel kills a middleware invocation outright at 25s with a raw 504 --

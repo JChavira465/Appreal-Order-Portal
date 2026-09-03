@@ -69,7 +69,7 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 0** (guides last regenerated
+- **Changes since last guide update: 3** (guides last regenerated
   September 3, 2026)
 
 ## Scheduled routines (standing instructions from the user)
@@ -127,7 +127,11 @@ select
   to_regclass('public.company_settings')  is not null as has_0036,
   to_regproc('public.has_feature(text)')  is not null as has_0037,
   to_regclass('public.company_features')  is not null as has_0038,
-  to_regproc('public.company_is_entitled(uuid)') is not null as has_0039;
+  to_regproc('public.company_is_entitled(uuid)') is not null as has_0039,
+  exists (select 1 from information_schema.columns
+           where table_name = 'orders' and column_name = 'revision_note') as has_0040,
+  exists (select 1 from information_schema.columns
+           where table_name = 'profiles' and column_name = 'signup_email') as has_0041;
 ```
 
 ## Things that have bitten us before

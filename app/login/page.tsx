@@ -79,6 +79,11 @@ export default async function LoginPage({
             Trouble signing in?
           </Link>
         </p>
+        <p className="mt-3 text-center text-xs text-neutral-400">
+          <Link href="/signup" className="underline">
+            Set up a new shop
+          </Link>
+        </p>
       </div>
     </main>
   );

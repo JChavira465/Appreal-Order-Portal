@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyMockupReady, notifyPaymentRecorded } from "@/lib/notify";
 import { uploadOrderImage, IMAGE_BUCKET } from "@/lib/order-images";
 import { isPaymentMethod, PAYMENT_METHOD_LABELS } from "@/lib/payment-methods";
 import { detectCarrier, isCarrier } from "@/lib/tracking";
@@ -75,10 +76,13 @@ export async function saveMockup(
     .update({
       status: "mockup_pending",
       revision_requested: false,
+      // A new mockup answers whatever was last asked for, so the
+      // outstanding request goes with it.
+      revision_note: null,
       mockup_notes: mockupNotes || null,
     })
     .eq("id", orderId)
-    .select("id")
+    .select("id, order_number, team_name, rep_id")
     .single();
 
   if (error || !data) return { ok: false, message: friendlyError(error) };
@@ -96,6 +100,19 @@ export async function saveMockup(
   }
 
   await logActivity(actor.supabase, orderId, actor.id, actor.name, "sent mockup to customer");
+
+  // The rep is the one who has to get this in front of the customer, and
+  // they have no reason to be looking at the app right now. Not awaited
+  // in a way that can fail the save -- the mockup is already stored.
+  if (data.rep_id !== actor.id) {
+    await notifyMockupReady({
+      repId: data.rep_id,
+      orderId,
+      orderNumber: data.order_number,
+      teamName: data.team_name,
+    });
+  }
+
   revalidatePath(`/orders/${orderId}`);
   return { ok: true, message: "Mockup saved." };
 }
@@ -375,6 +392,40 @@ export async function recordPayment(
     actor.name,
     `recorded a payment (${PAYMENT_METHOD_LABELS[method]})`,
   );
+
+  // "How much is still owed" is the only part of a payment anyone
+  // actually wants in the notification, so work it out here rather than
+  // making someone open the order to find out.
+  const { data: order } = await actor.supabase
+    .from("orders")
+    .select(
+      `company_id, order_number, team_name, shipping_fee, discount,
+       order_items(line_total), payments(amount)`,
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (order) {
+    const items = (order.order_items ?? []) as { line_total: number | null }[];
+    const paid = ((order.payments ?? []) as { amount: number | null }[]).reduce(
+      (sum, p) => sum + Number(p.amount ?? 0),
+      0,
+    );
+    const total =
+      items.reduce((sum, li) => sum + Number(li.line_total ?? 0), 0) +
+      Number(order.shipping_fee ?? 0) -
+      Number(order.discount ?? 0);
+
+    await notifyPaymentRecorded({
+      companyId: order.company_id as string,
+      orderId,
+      orderNumber: order.order_number,
+      teamName: order.team_name,
+      amount,
+      balanceDue: total - paid,
+    });
+  }
+
   revalidatePath(`/orders/${orderId}`);
   return { ok: true, message: "Payment recorded." };
 }

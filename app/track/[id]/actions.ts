@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyCustomerDecision } from "@/lib/notify";
 
 export type TrackActionResult = { ok: boolean; message: string } | null;
 
@@ -23,10 +24,14 @@ export async function customerApproveMockup(
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("orders")
-    .update({ status: "mockup_approved", revision_requested: false })
+    .update({
+      status: "mockup_approved",
+      revision_requested: false,
+      revision_note: null,
+    })
     .eq("id", orderId)
     .eq("status", "mockup_pending")
-    .select("id")
+    .select("id, company_id, rep_id, order_number, team_name")
     .maybeSingle();
 
   if (error) {
@@ -44,6 +49,16 @@ export async function customerApproveMockup(
     text: "approved the mockup",
   });
 
+  await notifyCustomerDecision({
+    companyId: data.company_id as string,
+    repId: data.rep_id as string,
+    orderId,
+    orderNumber: data.order_number,
+    teamName: data.team_name,
+    approved: true,
+    note: null,
+  });
+
   revalidatePath(`/track/${orderId}`);
   revalidatePath(`/orders/${orderId}`);
   return { ok: true, message: "Thanks — the shop's been notified you approved it." };
@@ -56,13 +71,19 @@ export async function customerRequestRevision(
   const orderId = String(formData.get("orderId") ?? "");
   if (!orderId) return { ok: false, message: "Missing order." };
 
+  // Optional on purpose. Making it required would push someone who just
+  // wants to say "not quite" back into a text message, which is the
+  // behaviour we're trying to replace. Capped because this is an
+  // unauthenticated write.
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 1000);
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("orders")
-    .update({ revision_requested: true })
+    .update({ revision_requested: true, revision_note: reason || null })
     .eq("id", orderId)
     .eq("status", "mockup_pending")
-    .select("id")
+    .select("id, company_id, rep_id, order_number, team_name")
     .maybeSingle();
 
   if (error) {
@@ -77,7 +98,21 @@ export async function customerRequestRevision(
     order_id: orderId,
     actor_id: null,
     actor_name: "Customer",
-    text: "requested changes to the mockup",
+    // The reason goes into the activity feed as well as onto the order,
+    // so round three can still see what round two asked for.
+    text: reason
+      ? `requested changes to the mockup: ${reason}`
+      : "requested changes to the mockup",
+  });
+
+  await notifyCustomerDecision({
+    companyId: data.company_id as string,
+    repId: data.rep_id as string,
+    orderId,
+    orderNumber: data.order_number,
+    teamName: data.team_name,
+    approved: false,
+    note: reason || null,
   });
 
   revalidatePath(`/track/${orderId}`);

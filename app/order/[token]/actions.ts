@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isBillingStatus, isEntitled } from "@/lib/plans";
 import { escapeLike } from "@/lib/like";
+import { notifyNewOrder } from "@/lib/notify";
 
 export type CustomerOrderResult = { ok: boolean; message: string } | null;
 
@@ -202,6 +203,19 @@ export async function submitCustomerOrder(
     actor_id: null,
     actor_name: contactName || teamName,
     text: "submitted this order from a customer link",
+  });
+
+  // The most important notification in the app. Nobody on staff is
+  // watching when a customer fills this out at 11pm, and an order that
+  // sits unseen for three days is the exact failure this whole feature
+  // exists to prevent.
+  await notifyNewOrder({
+    companyId: link.company_id,
+    orderId: order.id,
+    orderNumber: order.order_number,
+    teamName,
+    submittedBy: contactName || teamName,
+    fromCustomerLink: true,
   });
 
   return {

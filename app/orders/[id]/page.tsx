@@ -333,7 +333,7 @@ export default async function OrderDetailPage({
       .from("orders")
       .select(
         `id, order_number, team_name, contact_name, contact_phone, sport, status,
-         revision_requested, deadline, shipping_fee, shipping_address, discount,
+         revision_requested, revision_note, deadline, shipping_fee, shipping_address, discount,
          notes, mockup_notes, created_at, updated_at, rep_id,
          profiles(full_name),
          order_items(id, item, mods, qty, unit_price, line_total,
@@ -554,6 +554,21 @@ export default async function OrderDetailPage({
           revisionRequested={order.revision_requested}
         />
       </div>
+
+      {/* Sits directly under the status, above everything else on the
+          order. When a customer has asked for a change, what they asked
+          for is the single most useful thing on this screen -- burying it
+          in the activity feed means someone still calls to ask. */}
+      {order.revision_requested && order.revision_note && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+            Customer asked for
+          </div>
+          <p className="mt-1 whitespace-pre-line text-sm text-red-900">
+            {order.revision_note}
+          </p>
+        </div>
+      )}
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <Row label="Rep" value={repName} />

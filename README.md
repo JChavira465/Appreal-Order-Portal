@@ -208,6 +208,8 @@ lib/
   plans.ts                     the three tiers, their prices and which features each unlocks
   companyPlan.ts               loads a company's plan/billing state; requireFeature() gate
   stripe.ts                    Stripe client + tier<->price mapping, inert without keys
+  email.ts                     Resend wrapper; a no-op that logs when unconfigured
+  notify.ts                    the four moments worth emailing about
   like.ts                      escapes SQL LIKE wildcards before an ilike match
 supabase/migrations/           see below
 ```
@@ -274,9 +276,48 @@ supabase/migrations/           see below
 0039_trial_enforcement.sql    company_is_entitled(); an expired trial now closes access the
                                  same way suspension does, instead of trial_ends_at being a
                                  date nothing ever checked
+0040_revision_notes.sql       orders.revision_note — what the customer actually wants changed,
+                                 instead of a boolean that said only that someone was unhappy
+0041_self_serve_signup.sql    profiles.signup_email + unique index, so a shop can sign itself
+                                 up without the platform admin creating it by hand
 ```
 
 ## Changelog
+
+### September 3, 2026 — Notifications, self-serve signup, revision notes
+
+The three biggest gaps between what this app claims and what it did.
+
+**Nothing ever notified anybody.** No email, no SMS, anywhere. The pitch
+is "stop running your shop on texts", but a mockup going out still meant
+someone had to send a text — so the texts came back and the app became
+the extra step. Four moments now send email: a new order lands, a mockup
+is ready, the customer approves or asks for changes, a payment is
+recorded. Email is optional infrastructure like Stripe: with no
+`RESEND_API_KEY` every send is a logged no-op and nothing else changes.
+Nothing in `lib/notify.ts` can throw — an order that saved and didn't
+email beats an order that didn't save because an email did. Rep accounts
+carry synthetic `@staff.internal` addresses, which are filtered out
+before sending so they never bounce against the sending domain.
+
+**Only the platform admin could create a company.** Correct for three
+design partners, impossible at thirty — nobody could start a trial while
+he was asleep. `/signup` now creates the company, the owner, and a
+14-day trial in one step and signs them in. Everything that matters is
+set server-side from constants: tier, billing status, trial length, role
+and `platform_admin` are never read from the form, so a shop cannot sign
+itself up onto Unlimited or as a platform admin. Slug collisions get a
+numeric suffix rather than an error, because two shops sharing a name is
+normal. A failed owner account rolls the company row back, so a
+half-finished signup leaves nothing behind.
+
+**"Request changes" captured no reason.** The shop learned someone was
+unhappy and had to phone to find out why — the exact conversation this
+app exists to absorb. The customer now gets a box to say what they want
+changed; it lands at the top of the order screen under the status, and
+into the activity feed so round three can still read what round two
+asked for. Optional on purpose: making it required pushes someone who
+just wants to say "not quite" back into a text message.
 
 ### September 3, 2026 — Trials that actually end
 
