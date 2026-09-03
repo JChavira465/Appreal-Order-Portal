@@ -1,6 +1,6 @@
 # Order Desk — Rep Guide
 
-_Last updated: August 30, 2026_
+_Last updated: September 3, 2026_
 
 This is everything you need to know to take an order, track it, and get paid
 using the Order Desk.
@@ -67,7 +67,8 @@ For each item on the order:
     faster when you don't need a full roster.
   - Sizes go up to **8XL**. Pants/bottoms support a custom waist × length
     (e.g. "34x32") if a standard size doesn't fit.
-  - **Load saved roster** / **Save this roster** — if a team orders from
+  - **Load saved roster** / **Save this roster** _(not on every plan)_ —
+    if a team orders from
     you every season, save their roster once and load it back on a future
     order instead of retyping every name and number. Saved by team name,
     so it works even the very first time you type a brand-new team's name
@@ -137,12 +138,15 @@ lets the office know to make another pass — it doesn't collect a reason,
 so if the customer wants something specific changed, pass that along to
 the office separately (a note on the order, a text, whatever's fastest).
 
-## AI concept ideas
+## AI concept ideas _(not on every plan)_
 
 Before the office's official mockup, you can generate rough AI concept
 images on your own orders for early customer feedback — look for
 **"AI concept ideas (not official)"** on the order page. These are just
 quick, unofficial previews, not the real design.
+
+If you don't see this on your order page, your shop's plan doesn't
+include it — ask whoever runs the shop.
 
 ## Payments
 
@@ -152,6 +156,34 @@ on every order, but recording a payment itself is a manager action.
 If there's a balance due, you'll see a **Venmo pay link** you can send
 straight to the customer. Pick whichever partner/collector the payment
 should go to before sending the link.
+
+## Customer order link _(not on every plan)_
+
+Different from the tracking link below. **The tracking link is for an
+order that already exists. This one is for an order that doesn't.**
+
+On your home screen there's a **Customer order link** card. Tap
+**Create my link** once and you get a permanent link that's yours — you
+only ever need to make it once.
+
+Send that link to a customer and they fill the order out themselves:
+team name, contact, sport, deadline, shipping address, and the items
+with sizes and quantities, picked from your shop's real price list. When
+they submit, it lands in your queue **with your name on it**, exactly as
+if you'd typed it in.
+
+A few things worth knowing:
+
+- It's the same link every time. Send it to as many customers as you
+  like — you don't need a new one per customer.
+- Orders that come in this way are flagged as customer-entered, so the
+  office knows nobody on staff has checked the details yet. Give them a
+  read before they go to production.
+- The customer never signs in and never sees pricing beyond your own
+  price list, or anything about any other order.
+
+If you don't see the card on your home screen, your shop's plan doesn't
+include this yet.
 
 ## Customer tracking link
 
@@ -164,6 +196,8 @@ no-login page you can text or email to the customer. It shows:
   (see "Reviewing a mockup" above).
 - Any shipping tracking numbers the office has added, each a clickable
   link to that carrier's own tracking page.
+- Your shop's terms — payment, turnaround, tax and shipping — if the
+  office has filled them in.
 
 Tap **Copy** next to the link on the order page to grab it. No pricing,
 contact info, or cost data ever shows on this page — it's safe to hand to
@@ -173,7 +207,9 @@ anyone.
 
 **View / print receipt** on the order page opens a clean, customer-safe
 receipt — items, sizes, quantities, pricing, and balance due, with a
-**Print / Save as PDF** button. Nothing about cost, vendor, or profit ever
+**Print / Save as PDF** button. If your shop has filled in its terms
+(payment terms, turnaround time, tax and shipping), those print on the
+receipt too, so you don't have to explain them separately. Nothing about cost, vendor, or profit ever
 shows here. Use this for an actual paper or emailed receipt; it's a
 different page from the tracking link above (that one's for status, this
 one's for the money side).

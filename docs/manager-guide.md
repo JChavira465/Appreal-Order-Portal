@@ -1,6 +1,6 @@
 # Order Desk — Manager & Super Admin Guide
 
-_Last updated: August 30, 2026_
+_Last updated: September 3, 2026_
 
 Everything a manager (or anyone running the shop side) can do beyond what
 a rep can do. Anything marked **super_admin only** is restricted to the
@@ -12,9 +12,13 @@ account owner.
   payments. (See the Rep Guide for their side of things.)
 - **Manager** — sees and manages every order in the shop: pricing, vendors,
   costs, payments, mockups, and rep accounts.
-- **Super Admin** — everything a manager can do, plus Company financials
-  (profit splits, vendor balances), the Issues inbox, and adding/removing
-  other managers.
+- **Super Admin** — the account owner. Everything a manager can do, plus
+  Company financials (profit splits, vendor balances), **Plan & billing**,
+  and adding/removing other managers.
+
+Some features below depend on your plan. Anything your plan doesn't
+include shows a short screen explaining what it does and what it costs,
+rather than just going missing.
 
 ## Signing in
 
@@ -32,9 +36,13 @@ Managers see everything a rep sees, plus:
   your own.
 - **All Orders** (instead of "My Orders").
 - Extra links: **Pricing**, **Vendors**, **Customers**, **Reports**,
-  **Hat Orders** — and for super_admin, **Company** and **Issues**.
+  **Hat Orders**, **Shop Info** — and for super_admin, **Plan & Billing**
+  and **Company**.
 - **Add a rep** (with their name and a starting 4-digit PIN) — super_admin
-  can also **add a manager**.
+  can also **add a manager**. Each plan includes a set number of staff
+  accounts; if you're at the limit you'll be told the number, and you can
+  either upgrade or deactivate someone who's left. Only active accounts
+  count, so deactivating someone frees their seat immediately.
 - A list of staff you manage, where you can rename them or
   deactivate/reactivate their account. (A deactivated account can't sign
   in, but its order history stays intact.)
@@ -68,7 +76,7 @@ Same search/sort/filter tools reps have, plus:
 - **Advance the status** — moves the order forward one stage at a time
   (Submitted → Mockup Sent → Mockup Approved → In Production → Shipped).
 - **Cancel** any order, or **reopen** one you cancelled by mistake.
-- **Cost & vendor** section — assign a vendor and unit cost to each line
+- **Cost & vendor** section _(plan-dependent)_ — assign a vendor and unit cost to each line
   item, plus the order's shipping cost, supplies cost, and **vendor ready
   by** date (when the vendor expects to have it done — separate from the
   customer's deadline). Profit is computed automatically from the costs.
@@ -84,6 +92,12 @@ Same search/sort/filter tools reps have, plus:
   order can ship in more than one box). Pick the carrier or leave it on
   Auto-detect; both you and the rep see a clickable link to that carrier's
   tracking page, and it also shows on the customer tracking link (below).
+- **Customer order link** _(plan-dependent)_ — separate from the tracking
+  link below, and worth knowing about: each rep can generate one
+  permanent link on their home screen and send it to customers, who then
+  fill out the whole order themselves. Those orders arrive flagged as
+  customer-entered, because nobody on staff has checked the details yet —
+  give them a read before production.
 - **Customer tracking link** — every order gets a no-login link (copy
   button right on the order page) you or the rep can text/email the
   customer. Shows status, tracking numbers, and — once a mockup's posted —
@@ -108,7 +122,7 @@ bottoms, hat, etc. — used for reporting). Some add-ons are grouped as
 mutually-exclusive choices with a default (e.g. mesh type, collar style) —
 a customer picks one from the group, not several.
 
-## Vendors
+## Vendors _(plan-dependent)_
 
 Add or deactivate manufacturers and hat vendors. Each vendor has its own
 price list (tap into a vendor for their per-item costs) — this is what
@@ -123,7 +137,7 @@ history on the Order Board. A team with no order in 180+ days gets a
 small amber "No order in Nmo" badge — an easy way to spot who's worth a
 follow-up call.
 
-## Hat Orders
+## Hat Orders _(plan-dependent)_
 
 Every headwear line item across pending orders (not draft, cancelled, or
 already shipped), grouped by vendor and style, with a running total
@@ -143,7 +157,7 @@ three small ones.
   above. Use this one for trend/performance questions, not per-order
   detail.
 
-## Company _(super_admin only)_
+## Company _(super_admin only, plan-dependent)_
 
 - **Profit splits** — the fixed percentage each partner gets (e.g. two
   partners at 50/50, or several at uneven percentages).
@@ -153,16 +167,43 @@ three small ones.
   when this shipped forward — anyone who logged in before that just shows
   "Never logged in" until their next sign-in).
 
-## Issues inbox _(super_admin only)_
+## Shop Info
 
-Every report submitted through the Report Issue button, newest
-unresolved first. Each one shows who submitted it, what they said, which
-page they were on, and when. Check the box next to one once you've handled
-it — it sinks to the bottom of the list rather than disappearing, so
-there's still a record it happened.
+Your standing terms, written once and shown everywhere a customer looks:
 
-There's no email notification for these yet — checking `/issues` in the
-app is currently the only way to see them.
+- **Payment terms** — when you need to be paid, and what happens before an
+  order goes to production.
+- **Turnaround time** — how long production takes once an order's approved
+  and paid.
+- **Tax & shipping note** — anything a customer should know about charges
+  added to the final bill.
+
+These appear on every printed receipt, on the public tracking page
+customers get, and above the items on the customer order form your reps
+send out. Leave a field empty and it's hidden; leave all three empty and
+customers see no terms section at all.
+
+Write these once and you stop repeating them on every phone call.
+
+## Plan & billing _(super_admin only)_
+
+Shows your current plan, whether you're on a trial or paying, how many
+staff accounts your plan includes, and when it renews.
+
+From here you can switch plans or, once you're subscribed, manage your
+card and download invoices. Only the account owner sees this — a manager
+runs the shop day to day but doesn't sign up for the bill.
+
+If a payment fails, nothing switches off immediately. You'll see a notice
+asking you to update your card, and everything keeps working while that
+gets sorted.
+
+## Reporting a problem
+
+The **Report Issue** button in the bottom-right corner of every screen
+goes straight to the people who build and support the app — not to an
+inbox inside your shop. Describe what happened and submit; there's
+nothing else to do on your end.
 
 ## Managing staff
 

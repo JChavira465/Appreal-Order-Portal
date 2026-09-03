@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isBillingStatus, isEntitled } from "@/lib/plans";
 import { escapeLike } from "@/lib/like";
 
 export type CustomerOrderResult = { ok: boolean; message: string } | null;
@@ -35,12 +36,23 @@ export async function submitCustomerOrder(
     return { ok: false, message: "This order link is no longer active." };
   }
 
+  // Checked on submit as well as on page load: the form could have been
+  // opened while the shop was still active and posted minutes or days
+  // later, and this is the write that actually matters.
   const { data: company } = await admin
     .from("companies")
-    .select("active")
+    .select("active, billing_status, trial_ends_at")
     .eq("id", link.company_id)
     .single();
-  if (!company?.active) {
+
+  const shopEntitled =
+    company?.active === true &&
+    isEntitled(
+      isBillingStatus(company.billing_status) ? company.billing_status : "trialing",
+      company.trial_ends_at ?? null,
+    );
+
+  if (!shopEntitled) {
     return { ok: false, message: "This shop isn't accepting orders right now." };
   }
 

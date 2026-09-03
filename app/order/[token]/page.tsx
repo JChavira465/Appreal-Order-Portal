@@ -1,8 +1,40 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isBillingStatus, isEntitled } from "@/lib/plans";
 import { SIZES_BY_GROUP, isSizeGroup } from "@/lib/sizes";
 import { loadShopInfo } from "@/lib/shopInfo";
 import { ShopInfoBlock } from "@/app/ShopInfoBlock";
 import { CustomerOrderForm, type CustomerCatalogItem } from "./CustomerOrderForm";
+
+
+// Whether this company can currently transact at all -- mirrors
+// company_is_entitled() in 0039. The public order pages run on the
+// service-role client, which bypasses RLS entirely, so the entitlement
+// check that closes every other door for a lapsed company does NOT
+// happen here on its own. Without this, a shop whose trial ran out keeps
+// collecting customer orders into a queue nobody on staff can open --
+// the customer is the one who gets hurt, having submitted an order that
+// will never be seen.
+async function companyCanTakeOrders(
+  admin: ReturnType<typeof createAdminClient>,
+  companyId: string,
+): Promise<{ ok: boolean; name: string | null }> {
+  const { data: company, error } = await admin
+    .from("companies")
+    .select("name, active, billing_status, trial_ends_at")
+    .eq("id", companyId)
+    .single();
+
+  if (error) console.error("companyCanTakeOrders: query failed", error);
+  if (!company || !company.active) return { ok: false, name: company?.name ?? null };
+
+  return {
+    ok: isEntitled(
+      isBillingStatus(company.billing_status) ? company.billing_status : "trialing",
+      company.trial_ends_at ?? null,
+    ),
+    name: company.name,
+  };
+}
 
 export default async function CustomerOrderPage({
   params,
@@ -20,15 +52,11 @@ export default async function CustomerOrderPage({
     .eq("token", token)
     .maybeSingle();
 
-  const { data: company } = link
-    ? await admin
-        .from("companies")
-        .select("name, active")
-        .eq("id", link.company_id)
-        .single()
-    : { data: null };
+  const company = link
+    ? await companyCanTakeOrders(admin, link.company_id)
+    : { ok: false, name: null };
 
-  if (!link || !link.active || !company?.active) {
+  if (!link || !link.active || !company.ok) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
         <div className="w-full max-w-sm">
