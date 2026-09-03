@@ -268,9 +268,41 @@ supabase/migrations/           see below
 0037_plans_and_billing.sql    tier + billing columns on companies, has_feature()/
                                  tier_seat_limit(), and RLS on every gated table so a plan
                                  can't be bypassed through PostgREST
+0038_company_feature_overrides.sql  company_features table + override-aware has_feature(),
+                                       so one company can be granted or denied a single
+                                       feature without moving their whole tier
 ```
 
 ## Changelog
+
+### September 3, 2026 — Per-company feature overrides
+
+Tier is the right default and the wrong whole story. Real deals don't fit
+three boxes: a beta tester gets AI concepts thrown in while paying
+Starter money, a shop needs cost tracking today and will upgrade next
+month, someone abuses a feature and has it pulled without a price change.
+All three are "this company, this feature", not "this tier".
+
+So tier stays the baseline and an override wins over it, in **both**
+directions — force a feature on that the plan doesn't include, or off
+that it does. A feature with no override just follows the tier, which is
+the case for nearly every company nearly always.
+
+Each company now has its own page under Companies showing what they're
+on, what it lists at, how many staff seats they're using, whether Stripe
+is connected, and a three-state control per feature: *plan default*,
+*force on*, *force off*. Overrides carry a note field, because six months
+from now "why does this one shop have AI concepts on Starter" is a
+question with no answer unless it was written down at the time.
+
+Resolution order, in `has_feature()` and mirrored in `planAllows()`:
+platform admin → always yes; unpaid → always no; override → wins; else
+tier. The unpaid check sits **above** overrides deliberately — a grant
+made while a company was paying does not survive their cancellation.
+
+Writes to `company_features` are platform-admin only with no exceptions.
+A company able to write its own row there could hand itself every feature
+in the product.
 
 ### September 1, 2026 — Plans, billing, and a company switcher
 

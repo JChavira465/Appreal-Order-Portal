@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pinToPassword } from "@/lib/pin";
-import { isTier } from "@/lib/plans";
+import { FEATURES, isFeature, isTier, type Feature } from "@/lib/plans";
 
 export type CreateCompanyResult = { ok: boolean; message: string } | null;
 
@@ -249,3 +249,67 @@ export async function setCompanyTier(
   revalidatePath("/admin/companies");
   return { ok: true, message: "Plan updated." };
 }
+
+export type SetFeatureResult = { ok: boolean; message: string };
+
+// Per-company feature override (0038). Three states, and the third is
+// the important one: "tier default" isn't a value, it's the ABSENCE of a
+// row -- so clearing an override deletes it rather than writing some
+// neutral value, and the company goes back to following its tier
+// automatically if you later move them up or down.
+export async function setCompanyFeature(
+  companyId: string,
+  feature: string,
+  state: "on" | "off" | "default",
+  note: string,
+): Promise<SetFeatureResult> {
+  const { supabase, isPlatformAdmin } = await requirePlatformAdmin();
+  if (!isPlatformAdmin) {
+    return { ok: false, message: "Only the platform admin can do this." };
+  }
+  if (!isFeature(feature)) return { ok: false, message: "Unknown feature." };
+
+  if (state === "default") {
+    const { error } = await supabase
+      .from("company_features")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("feature", feature);
+    if (error) {
+      console.error("setCompanyFeature: delete failed", error);
+      return { ok: false, message: `Could not clear: ${error.message}` };
+    }
+    revalidatePath(`/admin/companies/${companyId}`);
+    return { ok: true, message: "Back to the plan default." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("company_features").upsert(
+    {
+      company_id: companyId,
+      feature,
+      enabled: state === "on",
+      note: note.trim().slice(0, 300) || null,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id ?? null,
+    },
+    { onConflict: "company_id,feature" },
+  );
+
+  if (error) {
+    console.error("setCompanyFeature: upsert failed", error);
+    return { ok: false, message: `Could not save: ${error.message}` };
+  }
+
+  revalidatePath(`/admin/companies/${companyId}`);
+  return {
+    ok: true,
+    message: state === "on" ? "Turned on for this company." : "Turned off for this company.",
+  };
+}
+
+export type { Feature };
+export { FEATURES };

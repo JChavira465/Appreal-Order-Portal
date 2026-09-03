@@ -13,6 +13,12 @@ import {
 
 export type CompanyPlan = {
   tier: Tier;
+  /**
+   * Per-company overrides on top of the tier (0038). A feature present
+   * here wins over what the tier says, in both directions -- true grants
+   * something the tier lacks, false removes something it includes.
+   */
+  overrides: Partial<Record<Feature, boolean>>;
   billingStatus: BillingStatus;
   billingPeriod: "monthly" | "yearly" | null;
   trialEndsAt: string | null;
@@ -30,6 +36,7 @@ export type CompanyPlan = {
 // here shows the wrong screen, it never hands out data.
 const FALLBACK: CompanyPlan = {
   tier: "starter",
+  overrides: {},
   billingStatus: "trialing",
   billingPeriod: null,
   trialEndsAt: null,
@@ -45,14 +52,30 @@ export async function loadCompanyPlan(
 ): Promise<CompanyPlan> {
   if (!companyId) return FALLBACK;
 
-  const { data, error } = await supabase
-    .from("companies")
-    .select(
-      `tier, billing_status, billing_period, trial_ends_at,
-       current_period_end, stripe_customer_id, stripe_subscription_id`,
-    )
-    .eq("id", companyId)
-    .maybeSingle();
+  const [{ data, error }, { data: overrideRows, error: overrideError }] =
+    await Promise.all([
+      supabase
+        .from("companies")
+        .select(
+          `tier, billing_status, billing_period, trial_ends_at,
+           current_period_end, stripe_customer_id, stripe_subscription_id`,
+        )
+        .eq("id", companyId)
+        .maybeSingle(),
+      supabase
+        .from("company_features")
+        .select("feature, enabled")
+        .eq("company_id", companyId),
+    ]);
+
+  if (overrideError) {
+    console.error("loadCompanyPlan: overrides query failed", overrideError);
+  }
+
+  const overrides: Partial<Record<Feature, boolean>> = {};
+  for (const row of overrideRows ?? []) {
+    overrides[row.feature as Feature] = row.enabled;
+  }
 
   // Per CLAUDE.md: never silently swallow an error on a query whose data
   // drives access. An unrun 0037 means every one of these columns is
@@ -63,6 +86,7 @@ export async function loadCompanyPlan(
   if (!data) return FALLBACK;
 
   return {
+    overrides,
     tier: isTier(data.tier) ? data.tier : "starter",
     billingStatus: isBillingStatus(data.billing_status)
       ? data.billing_status
@@ -79,9 +103,15 @@ export async function loadCompanyPlan(
   };
 }
 
+// Mirrors has_feature() in 0038, in the same order and for the same
+// reasons. An override beats the tier in both directions, but nothing
+// beats an unpaid account -- a grant made while a company was paying
+// does not survive their cancellation.
 export function planAllows(plan: CompanyPlan, feature: Feature): boolean {
   if (plan.isPlatformAdmin) return true;
   if (!statusIsEntitled(plan.billingStatus)) return false;
+  const override = plan.overrides[feature];
+  if (override !== undefined) return override;
   return planHasFeature(plan.tier, feature);
 }
 

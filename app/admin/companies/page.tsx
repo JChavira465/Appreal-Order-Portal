@@ -3,8 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateCompanyForm } from "./CreateCompanyForm";
 import { DeleteCompanyButton } from "./DeleteCompanyButton";
 import { SuspendCompanyButton } from "./SuspendCompanyButton";
-import { TierSelect } from "./TierSelect";
-import { BILLING_STATUS_COPY, isBillingStatus, isTier } from "@/lib/plans";
+import { BILLING_STATUS_COPY, PLANS, isBillingStatus, isTier } from "@/lib/plans";
 
 export default async function AdminCompaniesPage() {
   const supabase = await createClient();
@@ -104,15 +103,22 @@ export default async function AdminCompaniesPage() {
                   Backup
                 </a>
               </div>
-              <TierSelect
-                companyId={c.id}
-                tier={isTier(c.tier) ? c.tier : "starter"}
-                billingStatus={
-                  isBillingStatus(c.billing_status)
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-md bg-neutral-100 px-2 py-1 font-medium text-neutral-700">
+                  {PLANS[isTier(c.tier) ? c.tier : "starter"].name}
+                </span>
+                <span className="text-neutral-500">
+                  {isBillingStatus(c.billing_status)
                     ? BILLING_STATUS_COPY[c.billing_status]
-                    : "Free trial"
-                }
-              />
+                    : "Free trial"}
+                </span>
+                <Link
+                  href={`/admin/companies/${c.id}`}
+                  className="font-semibold text-black underline"
+                >
+                  Manage plan &amp; features
+                </Link>
+              </div>
 
               <SuspendCompanyButton
                 companyId={c.id}

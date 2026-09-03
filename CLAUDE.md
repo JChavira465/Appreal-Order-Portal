@@ -61,8 +61,8 @@ individual file edit within it.
 Change counter — increment by 1 each time a change is committed and
 pushed; reset to 0 immediately after regenerating both guides:
 
-- **Changes since last guide update: 4** (guides last regenerated August 30,
-  2026)
+- **Changes since last guide update: 5 — REGENERATE BOTH GUIDES NEXT**
+  (guides last regenerated August 30, 2026)
 
 ## Scheduled routines (standing instructions from the user)
 
@@ -117,7 +117,8 @@ select
              and policyname = 'price_modifiers_select'
              and qual like '%company_id = current_company_id()%') as has_0035,
   to_regclass('public.company_settings')  is not null as has_0036,
-  to_regproc('public.has_feature(text)')  is not null as has_0037;
+  to_regproc('public.has_feature(text)')  is not null as has_0037,
+  to_regclass('public.company_features')  is not null as has_0038;
 ```
 
 ## Things that have bitten us before

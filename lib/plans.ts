@@ -29,6 +29,19 @@ export type Feature =
   | "financials" // partner splits and vendor payments
   | "ai_concepts"; // AI-generated concept images
 
+export const FEATURES: Feature[] = [
+  "costs",
+  "customer_links",
+  "roster_templates",
+  "hats",
+  "financials",
+  "ai_concepts",
+];
+
+export function isFeature(value: string): value is Feature {
+  return (FEATURES as string[]).includes(value);
+}
+
 export type Plan = {
   tier: Tier;
   name: string;
