@@ -64,6 +64,34 @@ pushed; reset to 0 immediately after regenerating both guides:
 - **Changes since last guide update: 4** (guides last regenerated August 30,
   2026)
 
+## Scheduled routines (standing instructions from the user)
+
+Two recurring jobs run against this repo. Each fires a fresh session, so
+they carry no memory of previous runs -- read the README changelog and
+recent commits before claiming anything is new.
+
+- **5:00pm Central, daily -- "What's still not complete."** A single
+  checklist of everything outstanding, with step-by-step instructions a
+  non-developer can follow. Any SQL goes in exact run order, lowest
+  migration number first, preferably as one combined script rather than
+  several. If nothing is outstanding, say so in one line -- never
+  manufacture work to fill the report.
+
+- **10:00pm Central, daily -- deep security review.** Full audit (see
+  the threat list in the routine's own prompt). Fix only what purely
+  tightens access and cannot break working behaviour. Anything that
+  could break something, lock someone out, change what a company can
+  see, touch billing, or need a data-rewriting migration: STOP, explain
+  it in plain language, and wait for the user's decision. A clean night
+  reported as clean is a real result.
+
+**Deadline: this app must be production-ready by September 30, 2026.**
+Flag genuine risk to that date honestly rather than reassuringly.
+
+The user is the founder, not an engineer, and has said he often doesn't
+read long output. Lead with the two or three things that actually matter
+in plain language; put detail underneath.
+
 ## Before running any check the user asks for
 
 **Standing instruction from the user:** when they ask for a check, an
