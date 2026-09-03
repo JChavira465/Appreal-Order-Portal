@@ -3,7 +3,7 @@
 _Last updated: September 3, 2026_
 
 This is everything you need to know to take an order, track it, and get paid
-using the Apparel Logic.
+using Apparel Logic.
 
 ## Signing in
 
@@ -133,10 +133,17 @@ it gets approved:
   changes buttons — no login needed on their end. Either path does the
   same thing; use whichever's easier for that customer.
 
-**Revise** (or the customer's "Request changes") just flags the order and
-lets the office know to make another pass — it doesn't collect a reason,
-so if the customer wants something specific changed, pass that along to
-the office separately (a note on the order, a text, whatever's fastest).
+When the **customer** taps "Request changes" on the tracking link, they're
+asked what needs changing, and whatever they write appears right on the
+order for you and the office to read. Nobody has to relay it.
+
+When **you** tap **Revise** on the order page, that flags the order for
+another pass but doesn't collect a reason — so if you're the one
+requesting the change, pass the specifics along separately (a note on the
+order, a text, whatever's fastest).
+
+Either way the office gets an email the moment a mockup is approved or
+changes are requested, so you don't need to chase them about it.
 
 ## AI concept ideas _(not on every plan)_
 
@@ -153,9 +160,38 @@ include it — ask whoever runs the shop.
 Only the office records payments — you'll see **Paid** and **Balance due**
 on every order, but recording a payment itself is a manager action.
 
-If there's a balance due, you'll see a **Venmo pay link** you can send
-straight to the customer. Pick whichever partner/collector the payment
-should go to before sending the link.
+If there's a balance due, a **Pay this balance** panel appears on the
+order with whichever accounts the shop has set up — Venmo, Cash App,
+Apple Cash, Zelle. You don't set these up and you can't change them;
+they're the shop's accounts, and they show up automatically.
+
+Every order has a **reference** in that panel: the order number and the
+team name, like `#1042 Northside Wildcats 12U`. That reference is how the
+office matches a payment that lands in the account to the right order, so
+it matters. Tap **Copy** to grab it.
+
+For Venmo and Cash App there's also a **Copy link** button — that link
+opens the app with the amount already filled in (and, for Venmo, the
+reference too). Send the customer the link and the reference together and
+there's nothing for them to type.
+
+The customer sees the same panel on their tracking link, so most of the
+time you don't need to send anything at all — just point them at the
+tracking link.
+
+Money moves in the shop's own Venmo/Cash App, not through this app.
+Nothing marks itself paid: the office records the payment once it lands.
+
+## Emails you'll get
+
+If your manager put an email address on your account, the app emails you
+when **a mockup is ready on one of your orders** — that's your cue to get
+it in front of the customer. You'll also get an email when your customer
+approves the design or asks for changes.
+
+You don't need an email address to use the app (you sign in with your
+name and PIN either way). If you'd like these and you're not getting
+them, ask your manager to add your address to your account.
 
 ## Customer order link _(not on every plan)_
 
@@ -198,6 +234,8 @@ no-login page you can text or email to the customer. It shows:
   link to that carrier's own tracking page.
 - Your shop's terms — payment, turnaround, tax and shipping — if the
   office has filled them in.
+- **How to pay**, if there's a balance due — the amount, the reference to
+  put on the payment, and a button straight into Venmo or Cash App.
 
 Tap **Copy** next to the link on the order page to grab it. No pricing,
 contact info, or cost data ever shows on this page — it's safe to hand to

@@ -304,7 +304,15 @@ public marketing page.
 
 Also removed a duplicated "Reference photos" heading on the new-order
 form — the section header and the field label rendered identically, one
-directly above the other. It only became obvious in a screenshot.
+directly above the other. It only became obvious in a screenshot — and
+deleted `VenmoPayLink.tsx`, which nothing has imported since the payout
+accounts replaced it.
+
+Both user guides (`docs/rep-guide.md`, `docs/manager-guide.md`) were
+brought back in line with what's live: the payout handles and payment
+reference, the reason a customer now gives when requesting changes, which
+four emails the app sends and why an account with no email address gets
+none of them, and the fact that a trial ending now actually closes access.
 
 ### September 3, 2026 — Apparel Logic, and a front door
 

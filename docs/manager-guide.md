@@ -25,6 +25,13 @@ rather than just going missing.
 Same as reps: pick your name, enter your 4-digit PIN. Change your PIN any
 time from the home screen.
 
+If you're the owner and you signed the shop up yourself, the name and PIN
+you chose at sign-up are what you sign in with — your email address is on
+the account for notifications and the welcome email, not for signing in.
+Your shop's sign-in page is at its own address (your shop's name at the
+end of the link); bookmark it and everyone on the team lands on the right
+list of names.
+
 ## The home screen
 
 Managers see everything a rep sees, plus:
@@ -38,8 +45,10 @@ Managers see everything a rep sees, plus:
 - Extra links: **Pricing**, **Vendors**, **Customers**, **Reports**,
   **Hat Orders**, **Shop Info** — and for super_admin, **Plan & Billing**
   and **Company**.
-- **Add a rep** (with their name and a starting 4-digit PIN) — super_admin
-  can also **add a manager**. Each plan includes a set number of staff
+- **Add a rep** (with their name, a starting 4-digit PIN, and optionally
+  their email address) — super_admin can also **add a manager**. The email
+  is optional and isn't how they sign in; it's only where their
+  notifications go, and without it they simply don't get any. Each plan includes a set number of staff
   accounts; if you're at the limit you'll be told the number, and you can
   either upgrade or deactivate someone who's left. Only active accounts
   count, so deactivating someone frees their seat immediately.
@@ -102,13 +111,17 @@ Same search/sort/filter tools reps have, plus:
   button right on the order page) you or the rep can text/email the
   customer. Shows status, tracking numbers, and — once a mockup's posted —
   the mockup itself with its own Approve / Request changes buttons, so a
-  customer can respond directly instead of going through you.
+  customer can respond directly instead of going through you. When they
+  request changes they're asked what needs changing, and what they write
+  appears on the order — you get the actual reason, not just a flag.
 - **Send the mockup** — notes plus an optional image, moves the order into
   "Mockup Sent." From there either you approve/revise it on the customer's
   behalf after talking to them, or the customer does it themselves from
   the tracking link above.
 - **Record a payment** (cash, Venmo, Zelle, Cash App, check, card, or
-  other) and **apply a discount**.
+  other) and **apply a discount**. This is the only thing that moves the
+  balance — a customer paying through the handles on Shop Info doesn't
+  change the order until you record it.
 - **Delete** any uploaded photo (reference, mockup, or AI concept).
 - **View / print receipt** — a clean, customer-safe receipt (no cost,
   vendor, or profit info) with a Print / Save as PDF button, for actually
@@ -185,6 +198,35 @@ customers see no terms section at all.
 
 Write these once and you stop repeating them on every phone call.
 
+### Payment handles
+
+Further down the same page: the accounts customers actually pay into.
+Add a **Venmo**, **Cash App**, **Apple Cash** or **Zelle** handle, with an
+optional label for whose account it is ("Alex") so nobody wonders whether
+they're paying the right person.
+
+Once an account is here it shows up on its own — on every order with a
+balance due, and on the customer's tracking link — with the amount owed
+and a **reference**: the order number and team name, e.g.
+`#1042 Northside Wildcats 12U`. That reference is how a payment landing in
+your Venmo gets matched to an order, so it's worth telling customers to
+leave it alone.
+
+For Venmo and Cash App the app also builds a pay link that opens their app
+with the amount already filled in. Apple Cash and Zelle can't be linked to
+that way, so those show the handle and instructions instead.
+
+Two things to be clear about:
+
+- **The money goes straight into your account**, not through this app. We
+  don't touch it and don't take a cut of it.
+- **Nothing marks itself paid.** A customer paying by Venmo doesn't change
+  the order — you still record the payment on the order once it lands.
+  That's deliberate: the app only ever shows a balance you've confirmed.
+
+Remove an account and customers stop seeing it immediately. Adding and
+removing these is a manager-and-up action; reps can only see them.
+
 ## Plan & billing _(super_admin only)_
 
 Shows your current plan, whether you're on a trial or paying, how many
@@ -197,6 +239,33 @@ runs the shop day to day but doesn't sign up for the bill.
 If a payment fails, nothing switches off immediately. You'll see a notice
 asking you to update your card, and everything keeps working while that
 gets sorted.
+
+A **free trial is different from a failed payment**: when the trial date
+passes, access stops until a plan is picked. The days remaining are shown
+on this page throughout. Note that subscribing part-way through a trial
+starts the paid period straight away, so it's worth waiting until the
+trial's nearly up unless you need something your trial doesn't include.
+
+## Emails the app sends
+
+The app emails people at four moments, and only these four. Nothing else
+is sent, and there's no digest or marketing.
+
+- **A new order comes in** → every manager and the owner. Orders that a
+  customer filled out themselves say so, because nobody on staff has
+  checked those details yet.
+- **A mockup is posted** → the rep on that order, so they can get it in
+  front of their customer.
+- **The customer approves or requests changes** → the rep and every
+  manager, with whatever the customer wrote about what needs changing.
+- **A payment is recorded** → every manager and the owner, with the
+  balance still outstanding.
+
+These go to the email address on each person's account. Staff sign in with
+a name and PIN, so an account with no email address on it simply doesn't
+get notified — if someone says they're not getting emails, that's almost
+always why. Add it from their row on the home screen or when you create
+the account.
 
 ## Reporting a problem
 
