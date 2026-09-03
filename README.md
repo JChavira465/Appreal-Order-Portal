@@ -271,9 +271,38 @@ supabase/migrations/           see below
 0038_company_feature_overrides.sql  company_features table + override-aware has_feature(),
                                        so one company can be granted or denied a single
                                        feature without moving their whole tier
+0039_trial_enforcement.sql    company_is_entitled(); an expired trial now closes access the
+                                 same way suspension does, instead of trial_ends_at being a
+                                 date nothing ever checked
 ```
 
 ## Changelog
+
+### September 3, 2026 — Trials that actually end
+
+`trial_ends_at` was set, displayed, and never checked. "14-day free
+trial" meant "free forever" — fine while every company is someone you
+know, wrong the moment strangers sign up.
+
+Enforced through the same single point of control suspension uses:
+`current_company_id()` stops resolving once a trial lapses, and because
+nearly every RLS policy compares against it, everything closes at once
+with no per-policy changes. Both it and `has_feature()` now route through
+one `company_is_entitled()` function, so the rule can't drift between
+them.
+
+The shop sees a "your free trial has ended" screen with a link to the
+plans — deliberately a different screen from suspension, because this one
+has a way out the owner can take themselves. Their data is untouched and
+comes straight back on payment.
+
+**A null end date never expires.** Missing data must not lock anyone out:
+the safe failure is "keeps working", because a wrongly-locked-out paying
+customer is far worse than a trial that runs long. It also gives the
+platform admin a clean way to carry a design partner indefinitely.
+
+Trial dates are now editable from the company page — set a date, +14, +30,
+or "never expires" — so extending someone is a click rather than SQL.
 
 ### September 3, 2026 — Per-company feature overrides
 

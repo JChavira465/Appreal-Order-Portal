@@ -6,9 +6,10 @@ import {
   type Feature,
   type Tier,
   isBillingStatus,
+  isEntitled,
   isTier,
   planHasFeature,
-  statusIsEntitled,
+  trialHasExpired,
 } from "@/lib/plans";
 
 export type CompanyPlan = {
@@ -107,9 +108,14 @@ export async function loadCompanyPlan(
 // reasons. An override beats the tier in both directions, but nothing
 // beats an unpaid account -- a grant made while a company was paying
 // does not survive their cancellation.
+export function planExpired(plan: CompanyPlan): boolean {
+  if (plan.isPlatformAdmin) return false;
+  return trialHasExpired(plan.billingStatus, plan.trialEndsAt);
+}
+
 export function planAllows(plan: CompanyPlan, feature: Feature): boolean {
   if (plan.isPlatformAdmin) return true;
-  if (!statusIsEntitled(plan.billingStatus)) return false;
+  if (!isEntitled(plan.billingStatus, plan.trialEndsAt)) return false;
   const override = plan.overrides[feature];
   if (override !== undefined) return override;
   return planHasFeature(plan.tier, feature);

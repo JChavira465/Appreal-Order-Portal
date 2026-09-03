@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadCompanyPlan, planAllows } from "@/lib/companyPlan";
+import { isBillingStatus, trialHasExpired, type BillingStatus } from "@/lib/plans";
 import { signOut } from "./logout/actions";
 import { PinForm } from "./PinForm";
 import { AddRepForm } from "./AddRepForm";
@@ -47,7 +48,7 @@ export default async function HomePage() {
     // page just silently coming back empty with no explanation.
     const { data: company } = await supabase
       .from("companies")
-      .select("name, active")
+      .select("name, active, billing_status, trial_ends_at")
       .eq("id", profile.company_id)
       .single();
 
@@ -62,6 +63,55 @@ export default async function HomePage() {
               {company.name}&apos;s account is currently suspended. Contact
               the platform admin to resolve this.
             </p>
+            <form action={signOut} className="mt-8">
+              <button
+                type="submit"
+                className="text-xs text-neutral-400 underline"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </main>
+      );
+    }
+
+    // An expired trial closes the same doors suspension does (0039), so
+    // without this the shop would land on a home page whose every query
+    // silently returns nothing. Deliberately a different screen from
+    // suspension: this one has an obvious way out, and the owner can
+    // take it themselves.
+    const expired =
+      isBillingStatus(company?.billing_status ?? "") &&
+      trialHasExpired(
+        company!.billing_status as BillingStatus,
+        company!.trial_ends_at ?? null,
+      );
+
+    if (company && expired) {
+      const isOwner = profile?.role === "super_admin";
+      return (
+        <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 py-12 text-center">
+          <div className="w-full max-w-sm">
+            <h1 className="mb-4 text-lg font-bold text-black">
+              Your free trial has ended
+            </h1>
+            <p className="text-sm text-neutral-500">
+              {company.name}&apos;s trial is over. Your orders and everything
+              else are safe — pick a plan and it all comes straight back.
+            </p>
+            {isOwner ? (
+              <Link
+                href="/billing"
+                className="mt-6 block rounded-lg bg-black px-4 py-3 text-sm font-medium text-white"
+              >
+                See plans
+              </Link>
+            ) : (
+              <p className="mt-6 text-xs text-neutral-500">
+                Ask the account owner to pick a plan.
+              </p>
+            )}
             <form action={signOut} className="mt-8">
               <button
                 type="submit"

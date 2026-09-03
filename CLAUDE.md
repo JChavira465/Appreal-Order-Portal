@@ -118,7 +118,8 @@ select
              and qual like '%company_id = current_company_id()%') as has_0035,
   to_regclass('public.company_settings')  is not null as has_0036,
   to_regproc('public.has_feature(text)')  is not null as has_0037,
-  to_regclass('public.company_features')  is not null as has_0038;
+  to_regclass('public.company_features')  is not null as has_0038,
+  to_regproc('public.company_is_entitled(uuid)') is not null as has_0039;
 ```
 
 ## Things that have bitten us before

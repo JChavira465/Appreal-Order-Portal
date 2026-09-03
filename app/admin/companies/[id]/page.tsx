@@ -7,10 +7,13 @@ import {
   isBillingStatus,
   isFeature,
   isTier,
+  trialHasExpired,
+  type BillingStatus,
   type Feature,
 } from "@/lib/plans";
 import { TierSelect } from "../TierSelect";
 import { FeatureToggle } from "./FeatureToggle";
+import { TrialDate } from "./TrialDate";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -106,6 +109,13 @@ export default async function CompanyDetailPage({
     }
   }
 
+  const trialExpired =
+    isBillingStatus(company.billing_status) &&
+    trialHasExpired(
+      company.billing_status as BillingStatus,
+      company.trial_ends_at ?? null,
+    );
+
   const seatsUsed = staffCount ?? 0;
   const overSeats = plan.seats !== null && seatsUsed > plan.seats;
 
@@ -152,12 +162,6 @@ export default async function CompanyDetailPage({
               {company.billing_period ? ` · ${company.billing_period}` : ""}
             </dd>
           </div>
-          {company.billing_status === "trialing" && (
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Trial ends</dt>
-              <dd className="text-black">{fmtDate(company.trial_ends_at)}</dd>
-            </div>
-          )}
           {company.current_period_end && (
             <div className="flex justify-between">
               <dt className="text-neutral-500">Renews</dt>
@@ -177,6 +181,18 @@ export default async function CompanyDetailPage({
             </dd>
           </div>
         </dl>
+
+        {company.billing_status === "trialing" && (
+          <TrialDate
+            companyId={company.id}
+            value={
+              company.trial_ends_at
+                ? new Date(company.trial_ends_at).toISOString().slice(0, 10)
+                : ""
+            }
+            expired={trialExpired}
+          />
+        )}
 
         {overSeats && (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

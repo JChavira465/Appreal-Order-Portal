@@ -181,4 +181,26 @@ export function statusIsEntitled(status: BillingStatus): boolean {
   return status === "trialing" || status === "active" || status === "past_due";
 }
 
+// Mirrors company_is_entitled() in 0039. A trial that has run out is no
+// longer entitled to anything; a null end date never expires, because
+// the safe failure on missing data is "keeps working" -- wrongly locking
+// out a paying customer is a far worse outcome than a trial running long.
+export function isEntitled(
+  status: BillingStatus,
+  trialEndsAt: string | null,
+): boolean {
+  if (status === "active" || status === "past_due") return true;
+  if (status !== "trialing") return false;
+  if (!trialEndsAt) return true;
+  const ends = new Date(trialEndsAt);
+  return isNaN(ends.getTime()) || ends.getTime() > Date.now();
+}
+
+export function trialHasExpired(
+  status: BillingStatus,
+  trialEndsAt: string | null,
+): boolean {
+  return status === "trialing" && !isEntitled(status, trialEndsAt);
+}
+
 export const TRIAL_DAYS = 14;

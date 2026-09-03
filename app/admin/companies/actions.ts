@@ -313,3 +313,51 @@ export async function setCompanyFeature(
 
 export type { Feature };
 export { FEATURES };
+
+export type SetTrialResult = { ok: boolean; message: string };
+
+// Move, extend or remove a company's trial deadline. Since 0039 this is
+// a real lever, not a display value: past the date, current_company_id()
+// stops resolving and the shop loses access to everything until they pay
+// or the date moves. Clearing it entirely (empty input) means the trial
+// never expires -- the right answer for a design partner you've agreed
+// to carry, and the reason a null date is treated as "never" rather than
+// "already gone".
+export async function setCompanyTrialEnd(
+  companyId: string,
+  date: string,
+): Promise<SetTrialResult> {
+  const { supabase, isPlatformAdmin } = await requirePlatformAdmin();
+  if (!isPlatformAdmin) {
+    return { ok: false, message: "Only the platform admin can do this." };
+  }
+
+  let value: string | null = null;
+  const trimmed = date.trim();
+  if (trimmed) {
+    // A date input gives YYYY-MM-DD. Land on the end of that day so a
+    // trial "ending on the 17th" covers the whole of the 17th, which is
+    // what anyone typing that date means.
+    const parsed = new Date(`${trimmed}T23:59:59Z`);
+    if (isNaN(parsed.getTime())) {
+      return { ok: false, message: "That date didn't look right." };
+    }
+    value = parsed.toISOString();
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ trial_ends_at: value })
+    .eq("id", companyId);
+
+  if (error) {
+    console.error("setCompanyTrialEnd: update failed", error);
+    return { ok: false, message: `Could not save: ${error.message}` };
+  }
+
+  revalidatePath(`/admin/companies/${companyId}`);
+  return {
+    ok: true,
+    message: value ? "Trial date updated." : "Trial no longer expires.",
+  };
+}
